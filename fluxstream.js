@@ -23,9 +23,16 @@
 
   const PLAYER_COLOR = 0x00ffff; // Cyan
   const TRAIL_COLOR = 0x00ffff;
-  const RIVAL_COLOR = 0xff8000; // Orange
-  const RIVAL_TRAIL_COLOR = 0xff8000;
   const OBSTACLE_COLOR = 0xff0000; // Red
+
+  // Solarized Dark colors for rivals
+  const RIVAL_COLORS = [
+    0xdc322f, // red
+    0x859900, // green
+    0xb58900, // yellow
+    0x268bd2, // blue
+    0xd33682, // magenta
+  ];
 
   const GRID_SIZE = 50;
   const GRID_COLOR = 0x40406a;
@@ -33,7 +40,7 @@
   // Rivals
   const NUM_RIVALS = 5;
   const RIVAL_SPACING = TRAIL_WIDTH * 2; // Minimum spacing between players
-  const RIVAL_PENALTY_TIME = 400; // ms penalty when hitting obstacle
+  const RIVAL_PENALTY_TIME = 800; // ms penalty when hitting obstacle
 
   // Slipstream mechanic
   const SLIPSTREAM_RANGE = RIVAL_SPACING * 1.5; // Must be larger than spacing to allow slipstream
@@ -58,6 +65,9 @@
   const world = new PIXI.Container();
   app.stage.addChild(world);
 
+  const boundaryGraphics = new PIXI.Graphics();
+  world.addChild(boundaryGraphics);
+
   const trailGraphics = new PIXI.Graphics();
   world.addChild(trailGraphics);
 
@@ -73,7 +83,7 @@
   // --- UI Objects ---
   let slipstreamBar, slipstreamBarFill;
   let pauseOverlay, gameOverOverlay, splashScreenElement, vignetteElement;
-  let livesText;
+  let livesText, timeText, positionText;
 
   // --- Game State ---
   let player;
@@ -89,6 +99,12 @@
   let slipstreamActive = false;
   let lastObstacleX = -2000; // Track last obstacle position for spacing
   let obstacleDifficulty = 0; // Increases over time
+
+  // Race timing and scoring
+  const RACE_DURATION = 60000; // 60 seconds in ms
+  let raceStartTime = 0;
+  let raceTimeRemaining = RACE_DURATION;
+  let positionTimeTracking = [0, 0, 0, 0, 0, 0]; // Time spent in each position (1st-6th)
 
   // --- Setup Functions ---
 
@@ -136,6 +152,38 @@
     livesText.y = 20;
     app.stage.addChild(livesText);
 
+    // Time remaining
+    timeText = new PIXI.Text({
+      text: "1:00",
+      style: new PIXI.TextStyle({
+        fontFamily: "Sixtyfour",
+        fontSize: 32,
+        fontWeight: "bold",
+        fill: 0xffffff,
+        stroke: { color: 0x000000, width: 4 },
+      }),
+    });
+    timeText.anchor.set(1, 0);
+    timeText.x = app.screen.width - 20;
+    timeText.y = 20;
+    app.stage.addChild(timeText);
+
+    // Current position
+    positionText = new PIXI.Text({
+      text: "6th",
+      style: new PIXI.TextStyle({
+        fontFamily: "Sixtyfour",
+        fontSize: 24,
+        fontWeight: "bold",
+        fill: 0xffff00,
+        stroke: { color: 0x000000, width: 3 },
+      }),
+    });
+    positionText.anchor.set(0, 0);
+    positionText.x = 20;
+    positionText.y = 60;
+    app.stage.addChild(positionText);
+
     // Get overlays and vignette
     pauseOverlay = document.getElementById("pause-overlay");
     gameOverOverlay = document.getElementById("game-over-overlay");
@@ -169,6 +217,29 @@
     }
   }
 
+  function drawBoundaries() {
+    boundaryGraphics.clear();
+
+    // Draw the top and bottom boundaries of the playable area
+    const boundaryColor = 0x40406a; // Subtle purple-gray
+    const boundaryWidth = 2;
+    const visibleWidth = app.screen.width * 2; // Draw wide enough to cover screen
+
+    // Top boundary
+    boundaryGraphics.moveTo(cameraX - visibleWidth / 2, -WORLD_HEIGHT / 2);
+    boundaryGraphics.lineTo(cameraX + visibleWidth, -WORLD_HEIGHT / 2);
+
+    // Bottom boundary
+    boundaryGraphics.moveTo(cameraX - visibleWidth / 2, WORLD_HEIGHT / 2);
+    boundaryGraphics.lineTo(cameraX + visibleWidth, WORLD_HEIGHT / 2);
+
+    boundaryGraphics.stroke({
+      width: boundaryWidth,
+      color: boundaryColor,
+      alpha: 0.8,
+    });
+  }
+
   function drawTrails() {
     // Player trail
     trailGraphics.clear();
@@ -185,7 +256,7 @@
       });
     }
 
-    // Rival trails
+    // Rival trails - each with their own color
     rivalTrailGraphics.clear();
     rivals.forEach((rival, i) => {
       const trail = rivalTrails[i];
@@ -196,7 +267,7 @@
         }
         rivalTrailGraphics.stroke({
           width: TRAIL_WIDTH,
-          color: RIVAL_TRAIL_COLOR,
+          color: rival.color,
           cap: "round",
           join: "round",
         });
@@ -234,6 +305,8 @@
         width: TRAIL_WIDTH * 2,
         height: gapY - gapSize / 2 + WORLD_HEIGHT / 2
       };
+      topWall.gapY = gapY; // Store gap center for AI
+      topWall.gapSize = gapSize;
       obstacles.push(topWall);
       obstacleContainer.addChild(topWall);
 
@@ -251,14 +324,32 @@
         width: TRAIL_WIDTH * 2,
         height: WORLD_HEIGHT / 2 - (gapY + gapSize / 2)
       };
+      bottomWall.gapY = gapY; // Store gap center for AI
+      bottomWall.gapSize = gapSize;
       obstacles.push(bottomWall);
       obstacleContainer.addChild(bottomWall);
 
     } else {
       // Diagonal funnel - 45° angled walls creating a diagonal passage
       const angleUp = Math.random() < 0.5; // Randomize direction
-      const centerY = (Math.random() - 0.5) * WORLD_HEIGHT * 0.4; // More vertical variation
       const funnelWidth = 300;
+
+      // Calculate safe centerY range to ensure gap stays within track boundaries
+      // Gap exits at: centerY ± funnelWidth (depending on angle direction)
+      // Must ensure: -WORLD_HEIGHT/2 + gapSize/2 < gap exit < WORLD_HEIGHT/2 - gapSize/2
+      let minCenterY, maxCenterY;
+      if (angleUp) {
+        // Gap exits at centerY - funnelWidth, must be > -WORLD_HEIGHT/2 + gapSize/2
+        minCenterY = -WORLD_HEIGHT / 2 + gapSize / 2 + funnelWidth + 20;
+        maxCenterY = WORLD_HEIGHT / 2 - gapSize / 2 - 20;
+      } else {
+        // Gap exits at centerY + funnelWidth, must be < WORLD_HEIGHT/2 - gapSize/2
+        minCenterY = -WORLD_HEIGHT / 2 + gapSize / 2 + 20;
+        maxCenterY = WORLD_HEIGHT / 2 - gapSize / 2 - funnelWidth - 20;
+      }
+
+      // Random centerY within safe range
+      const centerY = minCenterY + Math.random() * (maxCenterY - minCenterY);
 
       // Create angled walls as filled polygons
       const topWall = new PIXI.Graphics();
@@ -424,14 +515,19 @@
 
   function handlePlayerHit() {
     if (player.invincibilityTimer > 0) return; // Already invincible
+    if (player.penaltyTimer) return; // Already in penalty
 
     player.lives--;
-    player.invincibilityTimer = INVINCIBILITY_TIME;
     updateLivesUI();
 
     if (player.lives <= 0) {
       endGame();
+      return;
     }
+
+    // Apply penalty like rivals - pause and teleport
+    player.penaltyTimer = RIVAL_PENALTY_TIME;
+    player.sprite.alpha = 0.3;
   }
 
   function pointInPolygon(x, y, vertices) {
@@ -521,16 +617,16 @@
     const isMovingHorizontal = Math.abs(player.vy) < 0.1;
 
     if (isMovingHorizontal) {
-      for (const rival of rivals) {
+      for (let i = 0; i < rivals.length; i++) {
+        const rival = rivals[i];
         // Must be ahead of player
         if (rival.x <= player.x) continue;
 
         // Check if truly adjacent (parallel, same Y level)
         const yDiff = Math.abs(player.y - rival.y);
-        const xDiff = rival.x - player.x;
 
-        // Must be close in Y and reasonably close in X
-        if (yDiff <= SLIPSTREAM_RANGE && xDiff < 150 && xDiff > 0) {
+        // Only check Y distance - if we're adjacent horizontally, we slipstream
+        if (yDiff <= SLIPSTREAM_RANGE) {
           isSlipstreaming = true;
           break;
         }
@@ -549,6 +645,8 @@
 
     // Visual effect when slipstreaming
     slipstreamActive = isSlipstreaming && slipstreamGauge > 50;
+
+    return isSlipstreaming; // Return for use in push-apart logic
   }
 
   function activateSlipstream() {
@@ -577,6 +675,7 @@
       lastMoveDirection: 0, // Track last Y movement direction for trail push
       lives: STARTING_LIVES,
       invincibilityTimer: 0,
+      penaltyTimer: null,
       sprite: playerSprite,
     };
 
@@ -590,7 +689,8 @@
 
     for (let i = 0; i < NUM_RIVALS; i++) {
       const rivalSprite = new PIXI.Graphics();
-      setupPlayerHead(rivalSprite, RIVAL_COLOR);
+      const rivalColor = RIVAL_COLORS[i % RIVAL_COLORS.length];
+      setupPlayerHead(rivalSprite, rivalColor);
       world.addChild(rivalSprite);
 
       const rival = {
@@ -598,6 +698,7 @@
         y: ((i - NUM_RIVALS / 2) * 100),
         vy: 0,
         lastMoveDirection: 0, // Track last Y movement direction
+        color: rivalColor,
         sprite: rivalSprite,
       };
 
@@ -613,14 +714,40 @@
     lastObstacleX = -2000;
     obstacleDifficulty = 0;
 
+    // Reset race timing
+    raceStartTime = Date.now();
+    raceTimeRemaining = RACE_DURATION;
+    positionTimeTracking = [0, 0, 0, 0, 0, 0];
+
     updateLivesUI();
 
     gameState = "playing";
   }
 
-  function endGame() {
+  function endGame(raceFinished = false) {
     if (gameState === "gameOver") return;
     gameState = "gameOver";
+
+    // Update title
+    const title = document.getElementById("game-over-title");
+    if (raceFinished) {
+      title.textContent = "FINISH";
+    } else {
+      title.textContent = "GAME OVER";
+    }
+
+    // Show results
+    const subtitle = document.getElementById("game-over-subtitle");
+    const total = positionTimeTracking.reduce((a, b) => a + b, 0);
+    let resultsHTML = "Time in each position:<br/>";
+    for (let i = 0; i < 6; i++) {
+      const percentage = total > 0 ? Math.round((positionTimeTracking[i] / total) * 100) : 0;
+      const suffix = ['st', 'nd', 'rd', 'th', 'th', 'th'][i];
+      resultsHTML += `${i + 1}${suffix}: ${percentage}%<br/>`;
+    }
+    resultsHTML += "<br/>Tap to Restart";
+    subtitle.innerHTML = resultsHTML;
+
     gameOverOverlay.style.display = "flex";
   }
 
@@ -743,7 +870,32 @@
       activateSlipstream();
     }
 
+    // --- Update Slipstream (must be before player physics for push-apart check) ---
+    const isSlipstreaming = updateSlipstream(delta);
+
     // --- Player Physics ---
+
+    // Check if player is in penalty (stopped after hitting obstacle)
+    let playerInPenalty = false;
+    if (player.penaltyTimer) {
+      playerInPenalty = true;
+      player.penaltyTimer -= delta * (1000 / 60);
+      player.sprite.alpha = 0.3;
+
+      if (player.penaltyTimer <= 0) {
+        player.penaltyTimer = null;
+        player.sprite.alpha = 1;
+        player.invincibilityTimer = INVINCIBILITY_TIME;
+
+        // Small teleport past obstacle - crashing should be SLOWER than navigating
+        player.x += 80;
+        playerInPenalty = false; // Penalty just ended, continue normally
+      }
+    }
+
+    // Only process player movement if not in penalty
+    if (!playerInPenalty) {
+
     // FAQ: "Your line's slope when moving up or down will be the same no matter how fast you are going"
     // The slope is CAPPED at 45°, but accelerates smoothly to reach it
 
@@ -791,31 +943,54 @@
     }
 
     // Check player-to-rival collision (push apart when too close)
-    for (const rival of rivals) {
-      const dx = player.x - rival.x;
-      const dy = player.y - rival.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+    // Only push if NOT slipstreaming - don't break slipstream
+    if (!isSlipstreaming) {
+      for (const rival of rivals) {
+        const dx = player.x - rival.x;
+        const dy = player.y - rival.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < RIVAL_SPACING && dist > 0) {
-        // Too close! Push player in the direction they were moving
-        const pushStrength = (RIVAL_SPACING - dist) * 0.4;
+        if (dist < RIVAL_SPACING && dist > 0) {
+          // Too close! Push player in the direction they were moving
+          const pushStrength = (RIVAL_SPACING - dist) * 0.3; // Reduced from 0.4
 
-        // Push in Y direction based on player's current velocity direction
-        if (Math.abs(player.vy) > 0.1) {
-          player.y += Math.sign(player.vy) * pushStrength;
-        } else {
-          // If not moving, push away from rival
-          player.y += (dy / dist) * pushStrength;
+          // Push in Y direction based on player's current velocity direction
+          if (Math.abs(player.vy) > 0.1) {
+            player.y += Math.sign(player.vy) * pushStrength;
+          } else {
+            // If not moving, push away from rival
+            player.y += (dy / dist) * pushStrength;
+          }
         }
       }
     }
+    } // End of player movement (if not in penalty)
 
-    // Update camera based on player's actual position
+    // Update camera based on player's actual position (always, even during penalty)
     cameraX = player.x - app.screen.width * 0.3; // Keep player at 30% from left (closer to center)
 
     // --- Rival Physics (Using same physics as player) ---
 
     rivals.forEach((rival, i) => {
+      // Check if rival is in penalty (stopped)
+      if (rival.penaltyTimer) {
+        rival.penaltyTimer -= delta * (1000 / 60); // Convert to ms
+        rival.sprite.alpha = 0.3; // Semi-transparent during penalty
+
+        if (rival.penaltyTimer <= 0) {
+          // End penalty - teleport just past the obstacle
+          rival.penaltyTimer = null;
+          rival.sprite.alpha = 1;
+
+          // Small jump just past obstacle - crashing should be SLOWER than navigating
+          // During 800ms penalty, rivals lose time that would have moved them ~288px
+          // So we only jump 80px, resulting in net loss of ~208px
+          rival.x += 80;
+        }
+        // DO NOT MOVE during penalty - just skip this rival
+        return;
+      }
+
       // AI: Stay mostly horizontal unless avoiding obstacles
       let targetY = rival.y; // Default: maintain current Y position
 
@@ -826,14 +1001,20 @@
       for (const obs of obstacles) {
         if (!obs.isWall) continue;
 
-        // Check if obstacle is directly ahead
+        // Check if obstacle is directly ahead (or we're inside it for diagonal funnels)
         const relX = obs.x - rival.x;
-        if (relX > 0 && relX < lookAheadDist) {
+
+        // For diagonal funnels, also check when inside (relX < 0 but > -funnelWidth)
+        const shouldCheckObstacle = obs.isDiagonal
+          ? (relX < lookAheadDist && relX > -obs.funnelWidth)
+          : (relX > 0 && relX < lookAheadDist);
+
+        if (shouldCheckObstacle) {
           // Check if we're on collision course
           let willCollide = false;
 
           if (obs.wallBounds) {
-            // Rectangular obstacle
+            // Rectangular obstacle - navigate to the gap center
             const bounds = obs.wallBounds;
             const obsWorldY = obs.y + bounds.y;
             const obsTop = obsWorldY;
@@ -842,36 +1023,42 @@
             // Will we hit this wall at our current Y?
             if (rival.y >= obsTop && rival.y <= obsBottom) {
               willCollide = true;
-              // Navigate to the gap - top or bottom wall determines which side is clear
-              if (obsWorldY < 0) {
-                targetY = 0; // Top wall, go to center/bottom
+              // Navigate to the gap center (stored in obstacle)
+              if (obs.gapY !== undefined) {
+                // Add per-rival offset so they don't all bunch up
+                targetY = obs.gapY + (i - NUM_RIVALS / 2) * TRAIL_WIDTH * 1.8;
               } else {
-                targetY = 0; // Bottom wall, go to center/top
+                // Fallback: go to center
+                targetY = 0;
               }
             }
           } else if (obs.isDiagonal) {
-            // Diagonal funnel - check if we'll pass through the gap
-            // The gap is at obs.centerY with height obs.gapSize
-            const gapTop = obs.centerY - obs.gapSize / 2;
-            const gapBottom = obs.centerY + obs.gapSize / 2;
+            // Diagonal funnel navigation
+            const distanceTraveled = Math.max(0, -relX);
+            const isInsideFunnel = relX < 0 && relX > -obs.funnelWidth;
 
-            // If we're not aligned with the gap, we'll collide
-            if (rival.y < gapTop || rival.y > gapBottom) {
-              willCollide = true;
-              // Navigate to gap center, spread out rivals
-              targetY = obs.centerY + (i - NUM_RIVALS / 2) * TRAIL_WIDTH * 2;
+            // Spread rivals within the gap
+            const rivalOffset = (i - NUM_RIVALS / 2) * TRAIL_WIDTH * 1.8;
 
-              // If funnel slopes up/down, adjust strategy
+            if (isInsideFunnel) {
+              // INSIDE the funnel: set target far in the funnel direction
+              // This causes continuous acceleration to maintain 45° movement
               if (obs.angleUp) {
-                // Funnel slopes upward, may need to move diagonally with it
-                if (relX < obs.funnelWidth * 0.5) {
-                  targetY = obs.centerY + (relX / obs.funnelWidth) * 100; // Gradual approach
-                }
+                targetY = obs.centerY - obs.funnelWidth * 2 + rivalOffset; // Far up
               } else {
-                // Funnel slopes downward
-                if (relX < obs.funnelWidth * 0.5) {
-                  targetY = obs.centerY - (relX / obs.funnelWidth) * 100; // Gradual approach
-                }
+                targetY = obs.centerY + obs.funnelWidth * 2 + rivalOffset; // Far down
+              }
+              willCollide = true; // Always navigate while inside
+            } else {
+              // APPROACHING the funnel: aim for the entrance
+              targetY = obs.centerY + rivalOffset;
+
+              // Check if we need to start navigating
+              const entranceGapTop = obs.centerY - obs.gapSize / 2;
+              const entranceGapBottom = obs.centerY + obs.gapSize / 2;
+
+              if (rival.y < entranceGapTop - 20 || rival.y > entranceGapBottom + 20) {
+                willCollide = true;
               }
             }
           }
@@ -886,11 +1073,13 @@
       const yDiff = targetY - rival.y;
 
       // Apply acceleration toward target
+      // Use stronger acceleration when actively avoiding obstacles
+      const accelStrength = mustAvoid ? 1.2 : 0.5; // Boost when avoiding
       if (yDiff > 10) {
-        rival.vy += PLAYER_ACCEL_Y * delta * 0.8;
+        rival.vy += PLAYER_ACCEL_Y * delta * accelStrength;
         rival.lastMoveDirection = 1;
       } else if (yDiff < -10) {
-        rival.vy -= PLAYER_ACCEL_Y * delta * 0.8;
+        rival.vy -= PLAYER_ACCEL_Y * delta * accelStrength;
         rival.lastMoveDirection = -1;
       } else {
         // Apply friction when not turning
@@ -899,35 +1088,6 @@
 
       // Clamp to fixed 45° slope
       rival.vy = Math.max(-PLAYER_BASE_SPEED, Math.min(PLAYER_BASE_SPEED, rival.vy));
-
-      // Check if rival is in penalty (stopped)
-      if (rival.penaltyTimer) {
-        rival.penaltyTimer -= delta * (1000 / 60); // Convert to ms
-        rival.sprite.alpha = 0.3; // Semi-transparent during penalty
-
-        if (rival.penaltyTimer <= 0) {
-          // End penalty - teleport past the obstacle
-          rival.penaltyTimer = null;
-          rival.sprite.alpha = 1;
-
-          // Find the obstacle they hit and jump past it
-          let jumpDistance = 350; // Default jump
-          for (const obs of obstacles) {
-            if (Math.abs(obs.x - rival.x) < 100) {
-              // This is the obstacle we hit
-              if (obs.funnelWidth) {
-                jumpDistance = obs.funnelWidth + 50; // Jump past funnel width
-              } else if (obs.wallBounds) {
-                jumpDistance = obs.wallBounds.width + 50; // Jump past wall width
-              }
-              break;
-            }
-          }
-          rival.x += jumpDistance;
-        }
-        // DO NOT MOVE during penalty - just skip this frame
-        return;
-      }
 
       // Check collision with obstacles BEFORE moving - pixel-based check
       const nextX = rival.x + PLAYER_BASE_SPEED * delta;
@@ -978,6 +1138,11 @@
       }
     });
 
+    // --- Update Mechanics ---
+
+    updateObstacles();
+    checkCollisions();
+
     // --- Update Player Trail ---
 
     if (
@@ -990,13 +1155,35 @@
       }
     }
 
-    // --- Update Mechanics ---
-
-    updateSlipstream(delta);
-    updateObstacles();
-    checkCollisions();
-
     if (gameState !== "playing") return;
+
+    // --- Update Race Timer ---
+    const now = Date.now();
+    const elapsed = now - raceStartTime;
+    raceTimeRemaining = Math.max(0, RACE_DURATION - elapsed);
+
+    // Calculate current position
+    let currentPosition = 1;
+    for (const rival of rivals) {
+      if (rival.x > player.x) {
+        currentPosition++;
+      }
+    }
+
+    // Track time in this position (delta time in ms)
+    const deltaMs = delta * (1000 / 60);
+    positionTimeTracking[currentPosition - 1] += deltaMs;
+
+    // Update UI
+    timeText.text = `${Math.floor(raceTimeRemaining / 1000)}:${String(Math.floor((raceTimeRemaining % 1000) / 10)).padStart(2, '0')}`;
+    const positionSuffix = ['st', 'nd', 'rd', 'th', 'th', 'th'];
+    positionText.text = `${currentPosition}${positionSuffix[currentPosition - 1]}`;
+
+    // End race when time runs out
+    if (raceTimeRemaining <= 0) {
+      endGame(true); // Pass true to indicate race finished (not crashed)
+      return;
+    }
 
     // --- Rendering ---
 
@@ -1026,6 +1213,7 @@
     world.pivot.set(cameraX, 0);
     world.position.set(0, app.screen.height / 2);
 
+    drawBoundaries();
     drawTrails();
     updateSlipstreamUI();
   });
