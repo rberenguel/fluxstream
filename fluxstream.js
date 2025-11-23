@@ -50,6 +50,12 @@
   const SLIPSTREAM_MAX = 100;
   const SLIPSTREAM_BOOST = 1.5; // speed multiplier
 
+  // Boost system
+  const BOOST_SPEED = 9.0; // Speed when boosting (higher than max slipstream)
+  const BOOST_DURATION = 2000; // ms - how long boost lasts
+  const BOOST_ZONE_SIZE = 60; // Size of boost pickup zones
+  const BOOST_ZONE_SPAWN_CHANCE = 0.002; // Spawn rate for boost zones
+
   // Lives/Turbo system (like Dotstream)
   const STARTING_LIVES = 3;
   const INVINCIBILITY_TIME = 60; // frames of invincibility after hit
@@ -93,6 +99,7 @@
   let trailPoints = [];
   let rivalTrails = [];
   let obstacles = [];
+  let boostZones = []; // Boost pickups on track
   let gameState = "splash"; // splash, playing, paused, gameOver
   let keys = {};
   let activeTouches = 0;
@@ -100,6 +107,7 @@
   let slipstreamGauge = 0;
   let slipstreamActive = false;
   let lastObstacleX = -2000; // Track last obstacle position for spacing
+  let lastBoostZoneX = -1000; // Track last boost zone position
   let obstacleDifficulty = 0; // Increases over time
 
   // Race timing and scoring
@@ -474,6 +482,84 @@
     }
   }
 
+  // --- Boost Zone System ---
+
+  function spawnBoostZone() {
+    const spawnX = cameraX + app.screen.width + CAMERA_BUFFER;
+    const spawnY = (Math.random() - 0.5) * WORLD_HEIGHT * 0.6; // Random Y position
+
+    const zone = new PIXI.Graphics();
+    zone.beginFill(0x00ff00); // Green
+    zone.drawRect(-BOOST_ZONE_SIZE / 2, -BOOST_ZONE_SIZE / 2, BOOST_ZONE_SIZE, BOOST_ZONE_SIZE);
+    zone.endFill();
+    zone.x = spawnX;
+    zone.y = spawnY;
+    zone.alpha = 0.7;
+
+    boostZones.push({
+      sprite: zone,
+      x: spawnX,
+      y: spawnY,
+      collected: false
+    });
+
+    obstacleContainer.addChild(zone);
+  }
+
+  function updateBoostZones() {
+    // Remove off-screen boost zones
+    for (let i = boostZones.length - 1; i >= 0; i--) {
+      const zone = boostZones[i];
+      if (zone.x < cameraX - 200) {
+        obstacleContainer.removeChild(zone.sprite);
+        zone.sprite.destroy();
+        boostZones.splice(i, 1);
+      }
+    }
+
+    // Spawn new boost zones randomly
+    const spawnX = cameraX + app.screen.width + CAMERA_BUFFER;
+    const distanceSinceLastBoost = spawnX - lastBoostZoneX;
+    const minBoostSpacing = 800; // Minimum distance between boost zones
+
+    if (distanceSinceLastBoost >= minBoostSpacing && Math.random() < BOOST_ZONE_SPAWN_CHANCE) {
+      spawnBoostZone();
+      lastBoostZoneX = spawnX;
+    }
+  }
+
+  function activateBoost(entity) {
+    entity.boostTimer = BOOST_DURATION;
+    entity.currentSpeed = BOOST_SPEED;
+  }
+
+  function checkBoostZoneCollisions() {
+    for (const zone of boostZones) {
+      if (zone.collected) continue;
+
+      // Check player collision
+      const playerDist = Math.sqrt((player.x - zone.x) ** 2 + (player.y - zone.y) ** 2);
+      if (playerDist < BOOST_ZONE_SIZE / 2 + TRAIL_WIDTH) {
+        zone.collected = true;
+        zone.sprite.alpha = 0.2; // Fade out
+        activateBoost(player);
+      }
+
+      // Check rival collisions
+      for (const rival of rivals) {
+        const rivalDist = Math.sqrt((rival.x - zone.x) ** 2 + (rival.y - zone.y) ** 2);
+        if (rivalDist < BOOST_ZONE_SIZE / 2 + TRAIL_WIDTH) {
+          zone.collected = true;
+          zone.sprite.alpha = 0.2; // Fade out
+          if (!rival.boostTimer) {
+            rival.boostTimer = BOOST_DURATION;
+          }
+          break;
+        }
+      }
+    }
+  }
+
   // --- Collision Detection ---
 
   function pointToSegmentDistanceSq(point, segP1, segP2) {
@@ -687,6 +773,7 @@
       lives: STARTING_LIVES,
       invincibilityTimer: 0,
       penaltyTimer: null,
+      boostTimer: 0, // Boost effect timer
       sprite: playerSprite,
     };
 
@@ -711,6 +798,7 @@
         lastMoveDirection: 0, // Track last Y movement direction
         color: rivalColor,
         sprite: rivalSprite,
+        boostTimer: 0, // Boost effect timer
       };
 
       rivals.push(rival);
@@ -718,11 +806,13 @@
     }
 
     obstacles = [];
+    boostZones = [];
     obstacleContainer.removeChildren();
     cameraX = 0;
     slipstreamGauge = 0;
     slipstreamActive = false;
     lastObstacleX = -2000;
+    lastBoostZoneX = -1000;
     obstacleDifficulty = 0;
 
     // Reset race timing
@@ -877,8 +967,14 @@
     const down = keys["ArrowDown"] || keys["KeyS"] || (activeTouches > 0 && keys["touchRight"]);
     const boost = keys["Space"] || (keys["touchLeft"] && keys["touchRight"]);
 
-    if (boost && slipstreamActive) {
-      activateSlipstream();
+    // Manual boost - consumes life (but can't use last life)
+    if (boost && player.lives > 1 && !player.boostTimer) {
+      player.lives--;
+      updateLivesUI();
+      activateBoost(player);
+      keys["Space"] = false; // Prevent holding
+      keys["touchLeft"] = false;
+      keys["touchRight"] = false;
     }
 
     // --- Update Slipstream (must be before player physics for push-apart check) ---
@@ -930,6 +1026,18 @@
     // Apply speed penalty when turning (FAQ: "Moving up or down will cause you to lose a little bit of speed")
     if (isTurning) {
       player.currentSpeed *= Math.pow(TURNING_SPEED_PENALTY, delta);
+    }
+
+    // Handle boost timer
+    if (player.boostTimer) {
+      player.boostTimer -= delta * (1000 / 60);
+      if (player.boostTimer <= 0) {
+        player.boostTimer = 0;
+        // Speed will return to normal via slipstream logic
+      } else {
+        // Maintain boost speed
+        player.currentSpeed = BOOST_SPEED;
+      }
     }
 
     // Update position
@@ -1126,8 +1234,19 @@
         return; // Don't move this frame
       }
 
+      // Handle boost timer for rivals
+      let rivalSpeed = RIVAL_BASE_SPEED;
+      if (rival.boostTimer) {
+        rival.boostTimer -= delta * (1000 / 60);
+        if (rival.boostTimer <= 0) {
+          rival.boostTimer = 0;
+        } else {
+          rivalSpeed = BOOST_SPEED;
+        }
+      }
+
       // Update position
-      rival.x += RIVAL_BASE_SPEED * delta;
+      rival.x += rivalSpeed * delta;
       const oldRivalY = rival.y;
       rival.y += rival.vy * delta;
 
@@ -1179,6 +1298,8 @@
     // --- Update Mechanics ---
 
     updateObstacles();
+    updateBoostZones();
+    checkBoostZoneCollisions();
     checkCollisions();
 
     // --- Update Player Trail ---
