@@ -1,15 +1,19 @@
 (async () => {
-  // --- Game Configuration ---
-  const PLAYER_BASE_SPEED = 5.9; // Base horizontal speed (increases with slipstream)
-  const PLAYER_MAX_SPEED = 8.0; // Maximum speed when slipstreaming
-  const RIVAL_BASE_SPEED = 6.0; // Rivals are slightly faster than player base speed
+  // --- Difficulty Settings ---
+  // 0.25 = Easy, 0.5 = Normal, 1.0 = Hard, 1.25 = Ultra Hard
+  const DIFFICULTY_MULTIPLIER = 0.5; // Normal difficulty
+
+  // --- Game Configuration (Responsive speeds based on screen width) ---
+  let PLAYER_BASE_SPEED = window.innerWidth * 0.0059 * DIFFICULTY_MULTIPLIER;
+  let PLAYER_MAX_SPEED = window.innerWidth * 0.008 * DIFFICULTY_MULTIPLIER;
+  let RIVAL_BASE_SPEED = window.innerWidth * 0.006 * DIFFICULTY_MULTIPLIER;
   const TURNING_SPEED_PENALTY = 0.98; // Speed multiplier when turning (slight slowdown)
-  const SLIPSTREAM_SPEED_INCREASE = 0.05; // How fast speed builds when slipstreaming
+  let SLIPSTREAM_SPEED_INCREASE = PLAYER_BASE_SPEED * 0.0085; // How fast speed builds when slipstreaming
   const SPEED_DECAY = 0.99; // How fast speed returns to base when not slipstreaming
 
-  const PLAYER_ACCEL_Y = 0.25; // Y-axis acceleration when input is held
+  let PLAYER_ACCEL_Y = PLAYER_BASE_SPEED * 0.042; // Y-axis acceleration when input is held
   const PLAYER_FRICTION_Y = 0.92; // Drift/deceleration when no input
-  const PLAYER_MAX_SPEED_Y = 4.0; // Max vertical velocity (MUST equal PLAYER_BASE_SPEED for 45° angle)
+  let PLAYER_MAX_SPEED_Y = PLAYER_BASE_SPEED * 0.68; // Max vertical velocity for 45° angle
 
   // Quantized movement - slope is fixed regardless of speed
   // This creates the distinctive Dotstream feel
@@ -51,7 +55,7 @@
   const SLIPSTREAM_BOOST = 1.5; // speed multiplier
 
   // Boost system
-  const BOOST_SPEED = 9.0; // Speed when boosting (higher than max slipstream)
+  let BOOST_SPEED = window.innerWidth * 0.009 * DIFFICULTY_MULTIPLIER; // Speed when boosting (responsive)
   const BOOST_DURATION = 2000; // ms - how long boost lasts
   let BOOST_ZONE_SIZE = WORLD_HEIGHT * 0.075; // Size of boost pickup zones (scales with world)
   const BOOST_ZONE_SPAWN_CHANCE = 0.002; // Spawn rate for boost zones
@@ -1264,6 +1268,7 @@
 
   // Recalculate responsive values on resize
   function updateResponsiveValues() {
+    // Update dimensions
     WORLD_HEIGHT = window.innerHeight * 0.8;
     CAMERA_BUFFER = window.innerWidth * 0.3;
     TRAIL_WIDTH = Math.max(3, WORLD_HEIGHT * 0.005);
@@ -1272,6 +1277,15 @@
     RIVAL_SPACING = TRAIL_WIDTH * 2;
     SLIPSTREAM_RANGE = RIVAL_SPACING * 1.5;
     BOOST_ZONE_SIZE = WORLD_HEIGHT * 0.075;
+
+    // Update speeds (responsive to screen width with difficulty multiplier)
+    PLAYER_BASE_SPEED = window.innerWidth * 0.0059 * DIFFICULTY_MULTIPLIER;
+    PLAYER_MAX_SPEED = window.innerWidth * 0.008 * DIFFICULTY_MULTIPLIER;
+    RIVAL_BASE_SPEED = window.innerWidth * 0.006 * DIFFICULTY_MULTIPLIER;
+    SLIPSTREAM_SPEED_INCREASE = PLAYER_BASE_SPEED * 0.0085;
+    PLAYER_ACCEL_Y = PLAYER_BASE_SPEED * 0.042;
+    PLAYER_MAX_SPEED_Y = PLAYER_BASE_SPEED * 0.68;
+    BOOST_SPEED = window.innerWidth * 0.009 * DIFFICULTY_MULTIPLIER;
   }
 
   window.addEventListener("resize", () => {
