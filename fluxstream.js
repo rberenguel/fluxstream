@@ -4,8 +4,9 @@
   const DIFFICULTY_MULTIPLIER = 0.5; // Normal difficulty
 
   // --- Game Configuration (Responsive speeds based on screen width) ---
-  let PLAYER_BASE_SPEED = window.innerWidth * 0.0059 * DIFFICULTY_MULTIPLIER;
-  let PLAYER_MAX_SPEED = window.innerWidth * 0.008 * DIFFICULTY_MULTIPLIER;
+  // Base speed is intentionally lower - momentum system brings it up to normal
+  let PLAYER_BASE_SPEED = (window.innerWidth * 0.0059 * DIFFICULTY_MULTIPLIER) / 1.05;
+  let PLAYER_MAX_SPEED = (window.innerWidth * 0.008 * DIFFICULTY_MULTIPLIER) / 1.05;
   let RIVAL_BASE_SPEED = window.innerWidth * 0.006 * DIFFICULTY_MULTIPLIER;
   const TURNING_SPEED_PENALTY = 0.98; // Speed multiplier when turning (slight slowdown)
   let SLIPSTREAM_SPEED_INCREASE = PLAYER_BASE_SPEED * 0.0085; // How fast speed builds when slipstreaming
@@ -55,7 +56,7 @@
   const SLIPSTREAM_BOOST = 1.5; // speed multiplier
 
   // Boost system
-  let BOOST_SPEED = window.innerWidth * 0.009 * DIFFICULTY_MULTIPLIER; // Speed when boosting (responsive)
+  let BOOST_SPEED = (window.innerWidth * 0.009 * DIFFICULTY_MULTIPLIER) / 1.05; // Speed when boosting (responsive)
   const BOOST_DURATION = 2000; // ms - how long boost lasts
   let BOOST_ZONE_SIZE = WORLD_HEIGHT * 0.075; // Size of boost pickup zones (scales with world)
   const BOOST_ZONE_SPAWN_CHANCE = 0.002; // Spawn rate for boost zones
@@ -112,7 +113,7 @@
   // --- UI Objects ---
   let slipstreamBar, slipstreamBarFill;
   let pauseOverlay, gameOverOverlay, splashScreenElement, vignetteElement;
-  let livesText, timeText, positionText, pursuerText;
+  let livesText, timeText, positionText, pursuerText, speedIndicator;
 
   // --- Game State ---
   let player;
@@ -162,8 +163,8 @@
     slipstreamBar = new PIXI.Graphics();
     slipstreamBar.lineStyle(2, 0xffffff);
     slipstreamBar.drawRect(0, 0, gaugeWidth, gaugeHeight);
-    slipstreamBar.x = 20;
-    slipstreamBar.y = app.screen.height - 40;
+    slipstreamBar.x = 20; // Left-aligned with other UI elements
+    slipstreamBar.y = 20;
     app.stage.addChild(slipstreamBar);
 
     slipstreamBarFill = new PIXI.Graphics();
@@ -186,7 +187,7 @@
     });
     livesText.anchor.set(0, 0);
     livesText.x = 20;
-    livesText.y = 20;
+    livesText.y = 20 + gaugeHeight + 10; // Below slipstream bar
     app.stage.addChild(livesText);
 
     // Time remaining
@@ -218,7 +219,7 @@
     });
     positionText.anchor.set(0, 0);
     positionText.x = 20;
-    positionText.y = 20 + mainFontSize + 10;
+    positionText.y = 20 + gaugeHeight + 10 + mainFontSize + 10; // Below lives text
     app.stage.addChild(positionText);
 
     // Pursuer indicator (shows closest rival behind)
@@ -236,6 +237,10 @@
     pursuerText.x = app.screen.width - 20;
     pursuerText.y = 20 + mainFontSize + 10;
     app.stage.addChild(pursuerText);
+
+    // Speed indicator (shows current speed state)
+    speedIndicator = new PIXI.Graphics();
+    app.stage.addChild(speedIndicator);
 
     // Get overlays and vignette
     pauseOverlay = document.getElementById("pause-overlay");
@@ -266,7 +271,8 @@
 
   function repositionUI() {
     if (slipstreamBar) {
-      slipstreamBar.y = app.screen.height - 40;
+      slipstreamBar.x = 20; // Left-aligned with other UI elements
+      slipstreamBar.y = 20;
     }
   }
 
@@ -901,6 +907,7 @@
       y: -NUM_RIVALS / 2 * verticalSpacing,
       vy: 0, // Y velocity
       currentSpeed: PLAYER_BASE_SPEED, // Current horizontal speed (varies)
+      speedMomentum: 1.05, // Speed multiplier from maintaining straight movement (0.95 to 1.05) - start at max
       lastMoveDirection: 0, // Track last Y movement direction for trail push
       lives: STARTING_LIVES,
       invincibilityTimer: 0,
@@ -1309,13 +1316,14 @@
     BOOST_ZONE_SIZE = WORLD_HEIGHT * 0.075;
 
     // Update speeds (responsive to screen width with difficulty multiplier)
-    PLAYER_BASE_SPEED = window.innerWidth * 0.0059 * DIFFICULTY_MULTIPLIER;
-    PLAYER_MAX_SPEED = window.innerWidth * 0.008 * DIFFICULTY_MULTIPLIER;
+    // Base speed divided by 1.05 so momentum system brings it to normal
+    PLAYER_BASE_SPEED = (window.innerWidth * 0.0059 * DIFFICULTY_MULTIPLIER) / 1.05;
+    PLAYER_MAX_SPEED = (window.innerWidth * 0.008 * DIFFICULTY_MULTIPLIER) / 1.05;
     RIVAL_BASE_SPEED = window.innerWidth * 0.006 * DIFFICULTY_MULTIPLIER;
     SLIPSTREAM_SPEED_INCREASE = PLAYER_BASE_SPEED * 0.0085;
     PLAYER_ACCEL_Y = PLAYER_BASE_SPEED * 0.042;
     PLAYER_MAX_SPEED_Y = PLAYER_BASE_SPEED * 0.68;
-    BOOST_SPEED = window.innerWidth * 0.009 * DIFFICULTY_MULTIPLIER;
+    BOOST_SPEED = (window.innerWidth * 0.009 * DIFFICULTY_MULTIPLIER) / 1.05;
   }
 
   window.addEventListener("resize", () => {
@@ -1378,6 +1386,7 @@
     // The slope is CAPPED at 45°, but accelerates smoothly to reach it
 
     const isTurning = up || down;
+    const isMovingHorizontal = Math.abs(player.vy) < 0.1;
 
     // Apply acceleration with inertia
     if (up) {
@@ -1393,6 +1402,22 @@
 
     // Clamp to 45° max slope (vy cannot exceed current speed)
     player.vy = Math.max(-player.currentSpeed, Math.min(player.currentSpeed, player.vy));
+
+    // Speed momentum system: reward sustained horizontal movement
+    // Momentum ranges from 0.95 (just turned) to 1.05 (sustained horizontal = normal speed)
+    const MOMENTUM_BUILD_RATE = 0.003; // How fast momentum builds when horizontal
+    const MOMENTUM_DECAY_RATE = 0.04; // How fast momentum decays when turning
+    const MAX_MOMENTUM = 1.05;
+    const MIN_MOMENTUM = 0.95;
+
+    if (isMovingHorizontal && !isTurning) {
+      // Building momentum while moving straight
+      player.speedMomentum = Math.min(MAX_MOMENTUM, player.speedMomentum + MOMENTUM_BUILD_RATE * delta);
+    } else if (isTurning) {
+      // Lose momentum when turning
+      player.speedMomentum = Math.max(MIN_MOMENTUM, player.speedMomentum - MOMENTUM_DECAY_RATE * delta);
+    }
+    // When just coasting (not turning but not fully horizontal), momentum stays same
 
     // Apply speed penalty when turning (FAQ: "Moving up or down will cause you to lose a little bit of speed")
     if (isTurning) {
@@ -1411,8 +1436,8 @@
       }
     }
 
-    // Update position
-    player.x += player.currentSpeed * delta;
+    // Update position (apply momentum multiplier to horizontal speed)
+    player.x += player.currentSpeed * player.speedMomentum * delta;
     const oldY = player.y;
     player.y += player.vy * delta;
 
@@ -1759,7 +1784,7 @@
     if (closestPursuer) {
       // Calculate time gap based on current speeds
       const timeGap = closestDistance / player.currentSpeed / 60; // Convert to seconds
-      pursuerText.text = `↓ ${timeGap.toFixed(1)}s`;
+      pursuerText.text = `v ${timeGap.toFixed(1)}s`;
     } else {
       pursuerText.text = ""; // No pursuers
     }
@@ -1794,6 +1819,45 @@
       playerSprite.alpha = Math.floor(player.invincibilityTimer / 5) % 2 === 0 ? 0.5 : 1.0; // Flashing
     } else {
       playerSprite.alpha = 1.0;
+    }
+
+    // Update speed indicator (next to position on left side)
+    speedIndicator.clear();
+    const indicatorX = 120; // Right of position text
+    const indicatorY = positionText.y + positionText.height / 2; // Vertically centered with position text
+    const dotSize = 6;
+    const dotSpacing = 12;
+
+    // Determine speed level: 1=slowed, 2=normal, 3=slipstream, 4=boost
+    let speedLevel = 2; // Default: normal
+    if (player.boostTimer > 0) {
+      speedLevel = 4; // Boosted
+    } else if (slipstreamActive) {
+      speedLevel = 3; // Slipstreaming
+    } else if (player.speedMomentum < 1.0) {
+      speedLevel = 1; // Slowed
+    }
+
+    // Draw speed dots horizontally
+    for (let i = 0; i < 4; i++) {
+      const x = indicatorX + i * dotSpacing;
+
+      if (i < speedLevel) {
+        // Active dot - colored based on speed level
+        let color;
+        if (speedLevel === 1) color = 0xff6666; // Red (slowed)
+        else if (speedLevel === 2) color = 0xffffff; // White (normal)
+        else if (speedLevel === 3) color = 0x00ff00; // Green (slipstream)
+        else color = 0xff00ff; // Magenta (boost)
+
+        speedIndicator.beginFill(color);
+      } else {
+        // Inactive dot - gray
+        speedIndicator.beginFill(0x404040);
+      }
+
+      speedIndicator.drawCircle(x, indicatorY, dotSize / 2);
+      speedIndicator.endFill();
     }
 
     rivals.forEach((rival) => {
