@@ -27,6 +27,102 @@
   const TRAIL_HISTORY = Infinity;
   let COLLISION_GRACE_DISTANCE = TRAIL_WIDTH * 7.5;
 
+  // Track system - vehicles snap to horizontal tracks for uniform spacing
+  const NUM_TRACKS = 50; // Many thin tracks for smooth movement feel
+  let TRACK_SPACING = WORLD_HEIGHT / (NUM_TRACKS - 1); // Distance between tracks
+
+  function snapToTrack(y) {
+    // Snap y position to nearest track
+    const trackIndex = Math.round((y + WORLD_HEIGHT / 2) / TRACK_SPACING);
+    return trackIndex * TRACK_SPACING - WORLD_HEIGHT / 2;
+  }
+
+  function snapToTrackInDirection(y, direction) {
+    // Snap to nearest track in the given direction (1 = down, -1 = up, 0 = nearest)
+    const currentTrackIndex = (y + WORLD_HEIGHT / 2) / TRACK_SPACING;
+    let targetTrackIndex;
+
+    if (direction > 0) {
+      targetTrackIndex = Math.ceil(currentTrackIndex);
+    } else if (direction < 0) {
+      targetTrackIndex = Math.floor(currentTrackIndex);
+    } else {
+      targetTrackIndex = Math.round(currentTrackIndex);
+    }
+
+    return targetTrackIndex * TRACK_SPACING - WORLD_HEIGHT / 2;
+  }
+
+  function getTrackIndex(y) {
+    return Math.round((y + WORLD_HEIGHT / 2) / TRACK_SPACING);
+  }
+
+  function isTrackOccupied(trackIndex, excludeVehicle, checkX) {
+    // Check if a track has any HORIZONTAL trail segments near the given X position
+    // Only check vehicles AHEAD in the race (higher X) - you can't be blocked by someone behind you
+    // Diagonal crossings don't count as occupying a track
+    const trackY = trackIndex * TRACK_SPACING - WORLD_HEIGHT / 2;
+    const xRangeBehind = WORLD_HEIGHT * 0.15; // Check trail behind
+    const xRangeAhead = WORLD_HEIGHT * 0.3; // Check trail ahead (further)
+
+    // Check player trail (only if player is ahead)
+    if (excludeVehicle !== 'player' && player.x > checkX) {
+      for (let j = 1; j < trailPoints.length; j++) {
+        const point = trailPoints[j];
+        const prevPoint = trailPoints[j - 1];
+        const xDist = point.x - checkX;
+
+        // Only check trail that's nearby (behind or slightly ahead)
+        if (xDist > -xRangeBehind && xDist < xRangeAhead) {
+          const pointTrack = getTrackIndex(point.y);
+
+          // Check if this segment is on the target track
+          if (pointTrack === trackIndex) {
+            // Check if segment is mostly horizontal (not a diagonal crossing)
+            const dx = Math.abs(point.x - prevPoint.x);
+            const dy = Math.abs(point.y - prevPoint.y);
+
+            // If horizontal movement is much greater than vertical, it's occupying the track
+            if (dx > dy * 3) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    // Check rival trails (only if rival is ahead)
+    for (let i = 0; i < rivalTrails.length; i++) {
+      if (excludeVehicle === i) continue;
+      const rival = rivals[i];
+      // Only check this rival if they're ahead in the race
+      if (rival.x <= checkX) continue;
+
+      const trail = rivalTrails[i];
+      for (let j = 1; j < trail.length; j++) {
+        const point = trail[j];
+        const prevPoint = trail[j - 1];
+        const xDist = point.x - checkX;
+
+        if (xDist > -xRangeBehind && xDist < xRangeAhead) {
+          const pointTrack = getTrackIndex(point.y);
+
+          if (pointTrack === trackIndex) {
+            // Check if segment is mostly horizontal
+            const dx = Math.abs(point.x - prevPoint.x);
+            const dy = Math.abs(point.y - prevPoint.y);
+
+            if (dx > dy * 3) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
   const PLAYER_COLOR = 0x00ffff; // Cyan
   const TRAIL_COLOR = 0x00ffff;
   const OBSTACLE_COLOR = 0xff0000; // Red
@@ -853,11 +949,12 @@
         // Must be ahead of player
         if (rival.x <= player.x) continue;
 
-        // Check if truly adjacent (parallel, same Y level)
-        const yDiff = Math.abs(player.y - rival.y);
+        // Check if on adjacent track (track-based slipstream)
+        const playerTrack = getTrackIndex(player.y);
+        const rivalTrack = getTrackIndex(rival.y);
 
-        // Only check Y distance - if we're adjacent horizontally, we slipstream
-        if (yDiff <= SLIPSTREAM_RANGE) {
+        // Slipstream works if on nearest adjacent track (not same track!)
+        if (Math.abs(playerTrack - rivalTrack) === 1) {
           isSlipstreaming = true;
           break;
         }
@@ -900,11 +997,14 @@
     // Initialize player at first position in diagonal (responsive sizing)
     const startX = app.screen.width * 0.1;
     const horizontalSpacing = app.screen.width * 0.15;
-    const verticalSpacing = WORLD_HEIGHT / (NUM_RIVALS + 1);
+
+    // Calculate vertical spacing based on tracks to ensure uniform separation
+    const trackSpacing = Math.ceil((NUM_RIVALS + 1) / NUM_TRACKS * NUM_TRACKS); // Spread across multiple tracks
+    const verticalSpacing = TRACK_SPACING * 2; // Use 2 tracks apart for nice spacing
 
     player = {
       x: startX,
-      y: -NUM_RIVALS / 2 * verticalSpacing,
+      y: snapToTrack(-NUM_RIVALS * verticalSpacing / 2), // Snap to track
       vy: 0, // Y velocity
       currentSpeed: PLAYER_BASE_SPEED, // Current horizontal speed (varies)
       speedMomentum: 1.05, // Speed multiplier from maintaining straight movement (0.95 to 1.05) - start at max
@@ -942,7 +1042,7 @@
 
       const rival = {
         x: startX + (i + 1) * horizontalSpacing,
-        y: player.y + (i + 1) * verticalSpacing,
+        y: snapToTrack(player.y + (i + 1) * verticalSpacing), // Snap to track
         vy: 0,
         lastMoveDirection: 0, // Track last Y movement direction
         color: rivalColor,
@@ -1314,6 +1414,7 @@
     RIVAL_SPACING = TRAIL_WIDTH * 2;
     SLIPSTREAM_RANGE = RIVAL_SPACING * 1.5;
     BOOST_ZONE_SIZE = WORLD_HEIGHT * 0.075;
+    TRACK_SPACING = WORLD_HEIGHT / (NUM_TRACKS - 1); // Update track spacing
 
     // Update speeds (responsive to screen width with difficulty multiplier)
     // Base speed divided by 1.05 so momentum system brings it to normal
@@ -1438,46 +1539,42 @@
 
     // Update position (apply momentum multiplier to horizontal speed)
     player.x += player.currentSpeed * player.speedMomentum * delta;
-    const oldY = player.y;
-    player.y += player.vy * delta;
 
-    // Continuous push from rival trails based on last movement direction
-    for (const trail of rivalTrails) {
-      if (isCollidingWithTrail(player, trail)) {
-        // Always push in last movement direction (even if currently stationary)
-        const pushAmount = 3 * delta; // Continuous push force
+    // If not actively turning, smoothly glide to target track
+    if (!up && !down) {
+      // Determine target track in the direction of last movement
+      let targetY = snapToTrackInDirection(player.y, player.lastMoveDirection);
+      let targetTrack = getTrackIndex(targetY);
 
-        if (player.lastMoveDirection !== 0) {
-          player.y += player.lastMoveDirection * pushAmount;
-        } else {
-          // No previous movement - push back to old position
-          player.y = oldY;
-        }
-        break;
-      }
-    }
-
-    // Check player-to-rival collision (push apart when too close)
-    // Only push if NOT slipstreaming - don't break slipstream
-    if (!isSlipstreaming) {
-      for (const rival of rivals) {
-        const dx = player.x - rival.x;
-        const dy = player.y - rival.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist < RIVAL_SPACING && dist > 0) {
-          // Too close! Push player in the direction they were moving
-          const pushStrength = (RIVAL_SPACING - dist) * 0.3; // Reduced from 0.4
-
-          // Push in Y direction based on player's current velocity direction
-          if (Math.abs(player.vy) > 0.1) {
-            player.y += Math.sign(player.vy) * pushStrength;
-          } else {
-            // If not moving, push away from rival
-            player.y += (dy / dist) * pushStrength;
+      // If target track is occupied, keep searching in the SAME direction
+      if (isTrackOccupied(targetTrack, 'player', player.x)) {
+        // Search in the direction we were moving
+        const searchDirection = player.lastMoveDirection || 1; // Default to down if no direction
+        for (let offset = 1; offset <= 10; offset++) {
+          const nextTrack = targetTrack + (offset * searchDirection);
+          if (!isTrackOccupied(nextTrack, 'player', player.x)) {
+            targetTrack = nextTrack;
+            targetY = nextTrack * TRACK_SPACING - WORLD_HEIGHT / 2;
+            break;
           }
         }
       }
+
+      // Smoothly interpolate to target track
+      const snapSpeed = 0.15 * delta; // Smooth glide speed
+      player.y += (targetY - player.y) * snapSpeed;
+
+      // Also decay velocity
+      player.vy *= Math.pow(PLAYER_FRICTION_Y, delta);
+
+      // Lock to track when very close and not occupied
+      if (Math.abs(player.y - targetY) < 0.5 && !isTrackOccupied(targetTrack, 'player', player.x)) {
+        player.y = targetY;
+        player.vy = 0;
+      }
+    } else {
+      // Actively turning - free movement
+      player.y += player.vy * delta;
     }
     } // End of player movement (if not in penalty)
 
@@ -1675,36 +1772,39 @@
 
       // Update position
       rival.x += rivalSpeed * delta;
-      const oldRivalY = rival.y;
-      rival.y += rival.vy * delta;
 
-      // Continuous push from player trail based on last movement direction
-      if (isCollidingWithTrail(rival, trailPoints)) {
-        const pushAmount = 3 * delta;
-        if (rival.lastMoveDirection !== 0) {
-          rival.y += rival.lastMoveDirection * pushAmount;
-        } else {
-          rival.y = oldRivalY;
-        }
-      }
+      // Only glide to track when velocity is very close to zero AND not actively navigating
+      const isActivelyNavigating = Math.abs(yDiff) > 10;
+      if (Math.abs(rival.vy) < 0.3 && !isActivelyNavigating) {
+        let targetY = snapToTrackInDirection(rival.y, rival.lastMoveDirection);
+        let targetTrack = getTrackIndex(targetY);
 
-      // Push apart from other rivals (prevent bunching)
-      for (let j = 0; j < rivals.length; j++) {
-        if (i === j) continue; // Skip self
-        const otherRival = rivals[j];
-        const dx = rival.x - otherRival.x;
-        const dy = rival.y - otherRival.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist < RIVAL_SPACING && dist > 0) {
-          const pushStrength = (RIVAL_SPACING - dist) * 0.2;
-          // Push in Y direction
-          if (Math.abs(rival.vy) > 0.1) {
-            rival.y += Math.sign(rival.vy) * pushStrength;
-          } else {
-            rival.y += (dy / dist) * pushStrength;
+        // If target track is occupied, keep searching in the SAME direction
+        if (isTrackOccupied(targetTrack, i, rival.x)) {
+          // Search in the direction we were moving
+          const searchDirection = rival.lastMoveDirection || 1; // Default to down if no direction
+          for (let offset = 1; offset <= 10; offset++) {
+            const nextTrack = targetTrack + (offset * searchDirection);
+            if (!isTrackOccupied(nextTrack, i, rival.x)) {
+              targetTrack = nextTrack;
+              targetY = nextTrack * TRACK_SPACING - WORLD_HEIGHT / 2;
+              break;
+            }
           }
         }
+
+        // Smoothly interpolate to target track
+        const snapSpeed = 0.15 * delta;
+        rival.y += (targetY - rival.y) * snapSpeed;
+
+        // Lock to track when very close and not occupied
+        if (Math.abs(rival.y - targetY) < 0.5 && !isTrackOccupied(targetTrack, i, rival.x)) {
+          rival.y = targetY;
+          rival.vy = 0;
+        }
+      } else {
+        // Actively turning or moving - free movement
+        rival.y += rival.vy * delta;
       }
 
       // Keep within bounds (responsive margin)
