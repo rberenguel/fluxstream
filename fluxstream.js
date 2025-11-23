@@ -1,7 +1,8 @@
 (async () => {
   // --- Game Configuration ---
-  const PLAYER_BASE_SPEED = 6.0; // Base horizontal speed (increases with slipstream)
+  const PLAYER_BASE_SPEED = 5.9; // Base horizontal speed (increases with slipstream)
   const PLAYER_MAX_SPEED = 8.0; // Maximum speed when slipstreaming
+  const RIVAL_BASE_SPEED = 6.0; // Rivals are slightly faster than player base speed
   const TURNING_SPEED_PENALTY = 0.98; // Speed multiplier when turning (slight slowdown)
   const SLIPSTREAM_SPEED_INCREASE = 0.05; // How fast speed builds when slipstreaming
   const SPEED_DECAY = 0.99; // How fast speed returns to base when not slipstreaming
@@ -14,7 +15,7 @@
   // This creates the distinctive Dotstream feel
   const MOVEMENT_ANGLE_QUANTIZE = true;
 
-  const TRAIL_WIDTH = 6;
+  const TRAIL_WIDTH = 4;
   const TRAIL_HISTORY = Infinity;
   const COLLISION_GRACE_DISTANCE = 30;
 
@@ -281,8 +282,9 @@
   function spawnObstacle() {
     const spawnX = cameraX + app.screen.width + CAMERA_BUFFER;
 
-    // Gap must fit all 6 players (player + 5 rivals) with minimal spacing
-    const minGapSize = (NUM_RIVALS + 1) * TRAIL_WIDTH * 2; // Barely fits all players
+    // Gap must fit all 6 players (player + 5 rivals) with spacing
+    // Use larger multiplier since TRAIL_WIDTH is visual thickness, not spacing
+    const minGapSize = (NUM_RIVALS + 1) * TRAIL_WIDTH * 3.5; // Comfortable fit
     const gapSize = minGapSize + Math.random() * 30; // Slight variation
 
     const type = Math.random();
@@ -1087,10 +1089,10 @@
       }
 
       // Clamp to fixed 45° slope
-      rival.vy = Math.max(-PLAYER_BASE_SPEED, Math.min(PLAYER_BASE_SPEED, rival.vy));
+      rival.vy = Math.max(-RIVAL_BASE_SPEED, Math.min(RIVAL_BASE_SPEED, rival.vy));
 
       // Check collision with obstacles BEFORE moving - pixel-based check
-      const nextX = rival.x + PLAYER_BASE_SPEED * delta;
+      const nextX = rival.x + RIVAL_BASE_SPEED * delta;
       const nextY = rival.y + rival.vy * delta;
 
       const headX = nextX + TRAIL_WIDTH; // Front of bike
@@ -1108,7 +1110,7 @@
       }
 
       // Update position
-      rival.x += PLAYER_BASE_SPEED * delta;
+      rival.x += RIVAL_BASE_SPEED * delta;
       const oldRivalY = rival.y;
       rival.y += rival.vy * delta;
 
@@ -1119,6 +1121,25 @@
           rival.y += rival.lastMoveDirection * pushAmount;
         } else {
           rival.y = oldRivalY;
+        }
+      }
+
+      // Push apart from other rivals (prevent bunching)
+      for (let j = 0; j < rivals.length; j++) {
+        if (i === j) continue; // Skip self
+        const otherRival = rivals[j];
+        const dx = rival.x - otherRival.x;
+        const dy = rival.y - otherRival.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < RIVAL_SPACING && dist > 0) {
+          const pushStrength = (RIVAL_SPACING - dist) * 0.2;
+          // Push in Y direction
+          if (Math.abs(rival.vy) > 0.1) {
+            rival.y += Math.sign(rival.vy) * pushStrength;
+          } else {
+            rival.y += (dy / dist) * pushStrength;
+          }
         }
       }
 
