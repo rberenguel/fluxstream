@@ -5,8 +5,10 @@
 
   // --- Game Configuration (Responsive speeds based on screen width) ---
   // Base speed is intentionally lower - momentum system brings it up to normal
-  let PLAYER_BASE_SPEED = (window.innerWidth * 0.0059 * DIFFICULTY_MULTIPLIER) / 1.05;
-  let PLAYER_MAX_SPEED = (window.innerWidth * 0.008 * DIFFICULTY_MULTIPLIER) / 1.05;
+  let PLAYER_BASE_SPEED =
+    (window.innerWidth * 0.0059 * DIFFICULTY_MULTIPLIER) / 1.05;
+  let PLAYER_MAX_SPEED =
+    (window.innerWidth * 0.008 * DIFFICULTY_MULTIPLIER) / 1.05;
   let RIVAL_BASE_SPEED = window.innerWidth * 0.006 * DIFFICULTY_MULTIPLIER;
   const TURNING_SPEED_PENALTY = 0.98; // Speed multiplier when turning (slight slowdown)
   let SLIPSTREAM_SPEED_INCREASE = PLAYER_BASE_SPEED * 0.0085; // How fast speed builds when slipstreaming
@@ -66,7 +68,7 @@
     const xRangeAhead = WORLD_HEIGHT * 0.3; // Check trail ahead (further)
 
     // Check player trail (only if player is ahead)
-    if (excludeVehicle !== 'player' && player.x > checkX) {
+    if (excludeVehicle !== "player" && player.x > checkX) {
       for (let j = 1; j < trailPoints.length; j++) {
         const point = trailPoints[j];
         const prevPoint = trailPoints[j - 1];
@@ -360,7 +362,12 @@
     if (slipstreamGauge > 0) {
       const color = slipstreamActive ? 0x00ff00 : 0xffff00;
       slipstreamBarFill.beginFill(color);
-      slipstreamBarFill.drawRect(slipstreamBar.x + 2, slipstreamBar.y + 2, fillWidth - 4, gaugeHeight - 4);
+      slipstreamBarFill.drawRect(
+        slipstreamBar.x + 2,
+        slipstreamBar.y + 2,
+        fillWidth - 4,
+        gaugeHeight - 4,
+      );
       slipstreamBarFill.endFill();
     }
   }
@@ -412,15 +419,19 @@
 
     // Draw checkered pattern
     for (let y = -WORLD_HEIGHT / 2; y < WORLD_HEIGHT / 2; y += checkeredSize) {
-      const offset = Math.floor(y / checkeredSize) % 2 === 0 ? 0 : checkeredSize / 2;
+      const offset =
+        Math.floor(y / checkeredSize) % 2 === 0 ? 0 : checkeredSize / 2;
       for (let x = 0; x < lineWidth; x += checkeredSize) {
-        const color = Math.floor((x + offset) / checkeredSize) % 2 === 0 ? 0xffffff : 0x000000;
+        const color =
+          Math.floor((x + offset) / checkeredSize) % 2 === 0
+            ? 0xffffff
+            : 0x000000;
         finishLineGraphics.beginFill(color, 0.6);
         finishLineGraphics.drawRect(
           finishX - lineWidth / 2 + x,
           y,
           checkeredSize,
-          checkeredSize
+          checkeredSize,
         );
         finishLineGraphics.endFill();
       }
@@ -491,7 +502,12 @@
       // Top wall (covers from top of screen to gap)
       const topWall = new PIXI.Graphics();
       topWall.beginFill(OBSTACLE_COLOR);
-      topWall.drawRect(0, -WORLD_HEIGHT / 2, TRAIL_WIDTH * 2, (gapY - gapSize / 2) - (-WORLD_HEIGHT / 2));
+      topWall.drawRect(
+        0,
+        -WORLD_HEIGHT / 2,
+        TRAIL_WIDTH * 2,
+        gapY - gapSize / 2 - -WORLD_HEIGHT / 2,
+      );
       topWall.endFill();
       topWall.x = spawnX;
       topWall.y = 0;
@@ -500,7 +516,7 @@
         x: 0,
         y: -WORLD_HEIGHT / 2,
         width: TRAIL_WIDTH * 2,
-        height: gapY - gapSize / 2 + WORLD_HEIGHT / 2
+        height: gapY - gapSize / 2 + WORLD_HEIGHT / 2,
       };
       topWall.gapY = gapY; // Store gap center for AI
       topWall.gapSize = gapSize;
@@ -509,14 +525,19 @@
         x: spawnX,
         y: 0,
         isWall: true,
-        wallBounds: { ...topWall.wallBounds }
+        wallBounds: { ...topWall.wallBounds },
       });
       obstacleContainer.addChild(topWall);
 
       // Bottom wall (covers from gap to bottom of screen)
       const bottomWall = new PIXI.Graphics();
       bottomWall.beginFill(OBSTACLE_COLOR);
-      bottomWall.drawRect(0, gapY + gapSize / 2, TRAIL_WIDTH * 2, (WORLD_HEIGHT / 2) - (gapY + gapSize / 2));
+      bottomWall.drawRect(
+        0,
+        gapY + gapSize / 2,
+        TRAIL_WIDTH * 2,
+        WORLD_HEIGHT / 2 - (gapY + gapSize / 2),
+      );
       bottomWall.endFill();
       bottomWall.x = spawnX;
       bottomWall.y = 0;
@@ -525,7 +546,7 @@
         x: 0,
         y: gapY + gapSize / 2,
         width: TRAIL_WIDTH * 2,
-        height: WORLD_HEIGHT / 2 - (gapY + gapSize / 2)
+        height: WORLD_HEIGHT / 2 - (gapY + gapSize / 2),
       };
       bottomWall.gapY = gapY; // Store gap center for AI
       bottomWall.gapSize = gapSize;
@@ -534,10 +555,9 @@
         x: spawnX,
         y: 0,
         isWall: true,
-        wallBounds: { ...bottomWall.wallBounds }
+        wallBounds: { ...bottomWall.wallBounds },
       });
       obstacleContainer.addChild(bottomWall);
-
     } else {
       // Diagonal funnel - 45° angled walls creating a diagonal passage
       const angleUp = Math.random() < 0.5; // Randomize direction
@@ -572,13 +592,13 @@
           { x: 0, y: -WORLD_HEIGHT / 2 },
           { x: funnelWidth, y: -WORLD_HEIGHT / 2 },
           { x: funnelWidth, y: centerY - gapSize / 2 - funnelWidth },
-          { x: 0, y: centerY - gapSize / 2 }
+          { x: 0, y: centerY - gapSize / 2 },
         ];
         topWall.drawPolygon([
           new PIXI.Point(0, -WORLD_HEIGHT / 2),
           new PIXI.Point(funnelWidth, -WORLD_HEIGHT / 2),
           new PIXI.Point(funnelWidth, centerY - gapSize / 2 - funnelWidth),
-          new PIXI.Point(0, centerY - gapSize / 2)
+          new PIXI.Point(0, centerY - gapSize / 2),
         ]);
       } else {
         // Funnel going down
@@ -586,13 +606,13 @@
           { x: 0, y: -WORLD_HEIGHT / 2 },
           { x: funnelWidth, y: -WORLD_HEIGHT / 2 },
           { x: funnelWidth, y: centerY - gapSize / 2 + funnelWidth },
-          { x: 0, y: centerY - gapSize / 2 }
+          { x: 0, y: centerY - gapSize / 2 },
         ];
         topWall.drawPolygon([
           new PIXI.Point(0, -WORLD_HEIGHT / 2),
           new PIXI.Point(funnelWidth, -WORLD_HEIGHT / 2),
           new PIXI.Point(funnelWidth, centerY - gapSize / 2 + funnelWidth),
-          new PIXI.Point(0, centerY - gapSize / 2)
+          new PIXI.Point(0, centerY - gapSize / 2),
         ]);
       }
       topWall.endFill();
@@ -611,8 +631,8 @@
         y: 0,
         isWall: true,
         isDiagonal: true,
-        polygonVertices: topVertices.map(v => ({ ...v })),
-        angleUp: angleUp
+        polygonVertices: topVertices.map((v) => ({ ...v })),
+        angleUp: angleUp,
       });
       obstacleContainer.addChild(topWall);
 
@@ -625,26 +645,26 @@
           { x: 0, y: WORLD_HEIGHT / 2 },
           { x: funnelWidth, y: WORLD_HEIGHT / 2 },
           { x: funnelWidth, y: centerY + gapSize / 2 - funnelWidth },
-          { x: 0, y: centerY + gapSize / 2 }
+          { x: 0, y: centerY + gapSize / 2 },
         ];
         bottomWall.drawPolygon([
           new PIXI.Point(0, WORLD_HEIGHT / 2),
           new PIXI.Point(funnelWidth, WORLD_HEIGHT / 2),
           new PIXI.Point(funnelWidth, centerY + gapSize / 2 - funnelWidth),
-          new PIXI.Point(0, centerY + gapSize / 2)
+          new PIXI.Point(0, centerY + gapSize / 2),
         ]);
       } else {
         bottomVertices = [
           { x: 0, y: WORLD_HEIGHT / 2 },
           { x: funnelWidth, y: WORLD_HEIGHT / 2 },
           { x: funnelWidth, y: centerY + gapSize / 2 + funnelWidth },
-          { x: 0, y: centerY + gapSize / 2 }
+          { x: 0, y: centerY + gapSize / 2 },
         ];
         bottomWall.drawPolygon([
           new PIXI.Point(0, WORLD_HEIGHT / 2),
           new PIXI.Point(funnelWidth, WORLD_HEIGHT / 2),
           new PIXI.Point(funnelWidth, centerY + gapSize / 2 + funnelWidth),
-          new PIXI.Point(0, centerY + gapSize / 2)
+          new PIXI.Point(0, centerY + gapSize / 2),
         ]);
       }
       bottomWall.endFill();
@@ -663,8 +683,8 @@
         y: 0,
         isWall: true,
         isDiagonal: true,
-        polygonVertices: bottomVertices.map(v => ({ ...v })),
-        angleUp: angleUp
+        polygonVertices: bottomVertices.map((v) => ({ ...v })),
+        angleUp: angleUp,
       });
       obstacleContainer.addChild(bottomWall);
     }
@@ -691,7 +711,10 @@
     const distanceSinceLastObstacle = spawnX - lastObstacleX;
 
     // Only spawn if enough distance has passed
-    if (distanceSinceLastObstacle >= minSpacing && Math.random() < spawnChance) {
+    if (
+      distanceSinceLastObstacle >= minSpacing &&
+      Math.random() < spawnChance
+    ) {
       spawnObstacle();
       lastObstacleX = spawnX;
     }
@@ -705,7 +728,12 @@
 
     const zone = new PIXI.Graphics();
     zone.beginFill(0x00ff00); // Green
-    zone.drawRect(-BOOST_ZONE_SIZE / 2, -BOOST_ZONE_SIZE / 2, BOOST_ZONE_SIZE, BOOST_ZONE_SIZE);
+    zone.drawRect(
+      -BOOST_ZONE_SIZE / 2,
+      -BOOST_ZONE_SIZE / 2,
+      BOOST_ZONE_SIZE,
+      BOOST_ZONE_SIZE,
+    );
     zone.endFill();
     zone.x = spawnX;
     zone.y = spawnY;
@@ -715,14 +743,14 @@
       sprite: zone,
       x: spawnX,
       y: spawnY,
-      collectedBy: [] // Track which racers have collected this boost
+      collectedBy: [], // Track which racers have collected this boost
     });
 
     // Store for minimap
     allEncounteredBoostZones.push({
       x: spawnX,
       y: spawnY,
-      collectedBy: [] // Will be updated as racers collect it
+      collectedBy: [], // Will be updated as racers collect it
     });
 
     obstacleContainer.addChild(zone);
@@ -744,7 +772,10 @@
     const distanceSinceLastBoost = spawnX - lastBoostZoneX;
     const minBoostSpacing = app.screen.width * 0.8; // Responsive minimum distance between boost zones
 
-    if (distanceSinceLastBoost >= minBoostSpacing && Math.random() < BOOST_ZONE_SPAWN_CHANCE) {
+    if (
+      distanceSinceLastBoost >= minBoostSpacing &&
+      Math.random() < BOOST_ZONE_SPAWN_CHANCE
+    ) {
       spawnBoostZone();
       lastBoostZoneX = spawnX;
     }
@@ -760,15 +791,19 @@
       const zone = boostZones[zoneIdx];
 
       // Find corresponding entry in allEncounteredBoostZones
-      const allZone = allEncounteredBoostZones.find(z => z.x === zone.x && z.y === zone.y);
+      const allZone = allEncounteredBoostZones.find(
+        (z) => z.x === zone.x && z.y === zone.y,
+      );
 
       // Check player collision
-      const playerDist = Math.sqrt((player.x - zone.x) ** 2 + (player.y - zone.y) ** 2);
+      const playerDist = Math.sqrt(
+        (player.x - zone.x) ** 2 + (player.y - zone.y) ** 2,
+      );
       if (playerDist < BOOST_ZONE_SIZE / 2 + TRAIL_WIDTH) {
         // Only collect if player hasn't already collected this zone
-        if (!zone.collectedBy.includes('player')) {
-          zone.collectedBy.push('player');
-          if (allZone) allZone.collectedBy.push('player');
+        if (!zone.collectedBy.includes("player")) {
+          zone.collectedBy.push("player");
+          if (allZone) allZone.collectedBy.push("player");
           activateBoost(player);
         }
       }
@@ -776,7 +811,9 @@
       // Check rival collisions
       for (let i = 0; i < rivals.length; i++) {
         const rival = rivals[i];
-        const rivalDist = Math.sqrt((rival.x - zone.x) ** 2 + (rival.y - zone.y) ** 2);
+        const rivalDist = Math.sqrt(
+          (rival.x - zone.x) ** 2 + (rival.y - zone.y) ** 2,
+        );
         if (rivalDist < BOOST_ZONE_SIZE / 2 + TRAIL_WIDTH) {
           const rivalId = `rival${i}`;
           // Only collect if this rival hasn't already collected this zone
@@ -799,9 +836,13 @@
     const pointToP1Y = segP1.y - point.y;
 
     const segLenSq = segX * segX + segY * segY;
-    if (segLenSq === 0) return (point.x - segP1.x) ** 2 + (point.y - segP1.y) ** 2;
+    if (segLenSq === 0)
+      return (point.x - segP1.x) ** 2 + (point.y - segP1.y) ** 2;
 
-    const t = Math.max(0, Math.min(1, (-pointToP1X * segX - pointToP1Y * segY) / segLenSq));
+    const t = Math.max(
+      0,
+      Math.min(1, (-pointToP1X * segX - pointToP1Y * segY) / segLenSq),
+    );
     const closestX = segP1.x + t * segX;
     const closestY = segP1.y + t * segY;
 
@@ -853,17 +894,21 @@
     }
 
     // Apply position-based penalty: 800ms for 1st, 600ms otherwise
-    player.penaltyTimer = position === 1 ? LEADER_PENALTY_TIME : RIVAL_PENALTY_TIME;
+    player.penaltyTimer =
+      position === 1 ? LEADER_PENALTY_TIME : RIVAL_PENALTY_TIME;
     player.sprite.alpha = 0.3;
   }
 
   function pointInPolygon(x, y, vertices) {
     let inside = false;
     for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
-      const xi = vertices[i].x, yi = vertices[i].y;
-      const xj = vertices[j].x, yj = vertices[j].y;
+      const xi = vertices[i].x,
+        yi = vertices[i].y;
+      const xj = vertices[j].x,
+        yj = vertices[j].y;
 
-      const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      const intersect =
+        yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
       if (intersect) inside = !inside;
     }
     return inside;
@@ -885,8 +930,12 @@
       } else {
         // For rectangular obstacles, use bounds
         const bounds = obs.getLocalBounds();
-        if (localX >= bounds.x && localX <= bounds.x + bounds.width &&
-            localY >= bounds.y && localY <= bounds.y + bounds.height) {
+        if (
+          localX >= bounds.x &&
+          localX <= bounds.x + bounds.width &&
+          localY >= bounds.y &&
+          localY <= bounds.y + bounds.height
+        ) {
           return true;
         }
       }
@@ -917,9 +966,11 @@
     const headX = player.x + TRAIL_WIDTH; // Front of bike
     const headY = player.y;
 
-    if (isRedPixelAt(headX, headY) ||
-        isRedPixelAt(headX + 2, headY + 2) ||
-        isRedPixelAt(headX + 2, headY - 2)) {
+    if (
+      isRedPixelAt(headX, headY) ||
+      isRedPixelAt(headX + 2, headY + 2) ||
+      isRedPixelAt(headX + 2, headY - 2)
+    ) {
       handlePlayerHit();
       return;
     }
@@ -963,12 +1014,24 @@
 
     // Increase speed when slipstreaming
     if (isSlipstreaming) {
-      player.currentSpeed = Math.min(PLAYER_MAX_SPEED, player.currentSpeed + SLIPSTREAM_SPEED_INCREASE * delta);
-      slipstreamGauge = Math.min(SLIPSTREAM_MAX, slipstreamGauge + SLIPSTREAM_FILL_RATE * delta);
+      player.currentSpeed = Math.min(
+        PLAYER_MAX_SPEED,
+        player.currentSpeed + SLIPSTREAM_SPEED_INCREASE * delta,
+      );
+      slipstreamGauge = Math.min(
+        SLIPSTREAM_MAX,
+        slipstreamGauge + SLIPSTREAM_FILL_RATE * delta,
+      );
     } else {
       // Decay speed back to base
-      player.currentSpeed = Math.max(PLAYER_BASE_SPEED, player.currentSpeed * Math.pow(SPEED_DECAY, delta));
-      slipstreamGauge = Math.max(0, slipstreamGauge - SLIPSTREAM_FILL_RATE * delta * 0.5);
+      player.currentSpeed = Math.max(
+        PLAYER_BASE_SPEED,
+        player.currentSpeed * Math.pow(SPEED_DECAY, delta),
+      );
+      slipstreamGauge = Math.max(
+        0,
+        slipstreamGauge - SLIPSTREAM_FILL_RATE * delta * 0.5,
+      );
     }
 
     // Visual effect when slipstreaming
@@ -990,8 +1053,38 @@
 
   function startGame() {
     if (gameState !== "splash") return;
+    showCountdown();
+  }
 
+  function showCountdown() {
+    // Hide splash, show countdown
     splashScreenElement.style.display = "none";
+    const countdownOverlay = document.getElementById("countdown-overlay");
+    const countdownNumber = document.getElementById("countdown-number");
+
+    countdownOverlay.classList.add("active");
+
+    let count = 3;
+    countdownNumber.textContent = count;
+
+    const countdownInterval = setInterval(() => {
+      count--;
+      if (count > 0) {
+        // Reset animation by removing and re-adding
+        countdownNumber.style.animation = "none";
+        setTimeout(() => {
+          countdownNumber.style.animation = "";
+          countdownNumber.textContent = count;
+        }, 10);
+      } else {
+        clearInterval(countdownInterval);
+        countdownOverlay.classList.remove("active");
+        actuallyStartGame();
+      }
+    }, 1000);
+  }
+
+  function actuallyStartGame() {
     gameOverOverlay.style.display = "none";
 
     // Initialize player at first position in diagonal (responsive sizing)
@@ -999,12 +1092,14 @@
     const horizontalSpacing = app.screen.width * 0.15;
 
     // Calculate vertical spacing based on tracks to ensure uniform separation
-    const trackSpacing = Math.ceil((NUM_RIVALS + 1) / NUM_TRACKS * NUM_TRACKS); // Spread across multiple tracks
+    const trackSpacing = Math.ceil(
+      ((NUM_RIVALS + 1) / NUM_TRACKS) * NUM_TRACKS,
+    ); // Spread across multiple tracks
     const verticalSpacing = TRACK_SPACING * 2; // Use 2 tracks apart for nice spacing
 
     player = {
       x: startX,
-      y: snapToTrack(-NUM_RIVALS * verticalSpacing / 2), // Snap to track
+      y: snapToTrack((-NUM_RIVALS * verticalSpacing) / 2), // Snap to track
       vy: 0, // Y velocity
       currentSpeed: PLAYER_BASE_SPEED, // Current horizontal speed (varies)
       speedMomentum: 1.05, // Speed multiplier from maintaining straight movement (0.95 to 1.05) - start at max
@@ -1081,8 +1176,10 @@
 
   function renderMinimap() {
     // Calculate world bounds from all trails and entities
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      maxX = -Infinity;
+    let minY = Infinity,
+      maxY = -Infinity;
 
     // Include player trail
     for (const point of trailPoints) {
@@ -1140,10 +1237,12 @@
         // Render diagonal obstacle as polygon
         const points = [];
         for (const vertex of obs.polygonVertices) {
-          points.push(new PIXI.Point(
-            transformX(obs.x + vertex.x),
-            transformY(obs.y + vertex.y)
-          ));
+          points.push(
+            new PIXI.Point(
+              transformX(obs.x + vertex.x),
+              transformY(obs.y + vertex.y),
+            ),
+          );
         }
         minimapObstacles.beginFill(OBSTACLE_COLOR);
         minimapObstacles.drawPolygon(points);
@@ -1193,9 +1292,15 @@
 
     // Render player trail (on top)
     if (trailPoints.length > 1) {
-      minimapTrails.moveTo(transformX(trailPoints[0].x), transformY(trailPoints[0].y));
+      minimapTrails.moveTo(
+        transformX(trailPoints[0].x),
+        transformY(trailPoints[0].y),
+      );
       for (let i = 1; i < trailPoints.length; i++) {
-        minimapTrails.lineTo(transformX(trailPoints[i].x), transformY(trailPoints[i].y));
+        minimapTrails.lineTo(
+          transformX(trailPoints[i].x),
+          transformY(trailPoints[i].y),
+        );
       }
       minimapTrails.stroke({
         width: Math.max(1.5, TRAIL_WIDTH * scale),
@@ -1214,7 +1319,7 @@
     renderMinimap();
 
     // Wait for next frame to ensure rendering is complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Extract as canvas
     const canvas = app.renderer.extract.canvas(minimapContainer);
@@ -1223,7 +1328,7 @@
     minimapContainer.visible = false;
 
     // Convert to data URL
-    return canvas.toDataURL('image/png');
+    return canvas.toDataURL("image/png");
   }
 
   function endGame(raceFinished = false) {
@@ -1243,64 +1348,67 @@
     const total = positionTimeTracking.reduce((a, b) => a + b, 0);
     let resultsHTML = "Time in each position:<br/>";
     for (let i = 0; i < 6; i++) {
-      const percentage = total > 0 ? Math.round((positionTimeTracking[i] / total) * 100) : 0;
-      const suffix = ['st', 'nd', 'rd', 'th', 'th', 'th'][i];
+      const percentage =
+        total > 0 ? Math.round((positionTimeTracking[i] / total) * 100) : 0;
+      const suffix = ["st", "nd", "rd", "th", "th", "th"][i];
       resultsHTML += `${i + 1}${suffix}: ${percentage}%<br/>`;
     }
     resultsHTML += "<br/>Tap to Restart";
     subtitle.innerHTML = resultsHTML;
 
     // Generate and add minimap image
-    captureMinimapImage().then(dataUrl => {
-      // Create container like Flux does
-      let container = document.getElementById("minimap-container");
-      if (!container) {
-        container = document.createElement("div");
-        container.id = "minimap-container";
-        container.style.textAlign = "center";
-        container.style.marginTop = "20px";
+    captureMinimapImage()
+      .then((dataUrl) => {
+        // Create container like Flux does
+        let container = document.getElementById("minimap-container");
+        if (!container) {
+          container = document.createElement("div");
+          container.id = "minimap-container";
+          container.style.textAlign = "center";
+          container.style.marginTop = "20px";
 
-        const image = document.createElement("img");
-        image.id = "minimap-image";
-        image.style.maxWidth = "90%";
-        image.style.maxHeight = "400px";
-        image.style.marginBottom = "15px";
-        image.style.border = "2px solid #40406a";
-        image.style.background = "rgba(0, 0, 0, 0.5)";
-        image.style.padding = "5px";
+          const image = document.createElement("img");
+          image.id = "minimap-image";
+          image.style.maxWidth = "90%";
+          image.style.maxHeight = "400px";
+          image.style.marginBottom = "15px";
+          image.style.border = "2px solid #40406a";
+          image.style.background = "rgba(0, 0, 0, 0.5)";
+          image.style.padding = "5px";
 
-        const link = document.createElement("a");
-        link.id = "minimap-download-link";
-        link.textContent = "Save Your Race";
-        link.style.display = "block";
-        link.style.color = "#00ffff";
-        link.style.textDecoration = "none";
-        link.style.fontSize = "18px";
-        link.style.cursor = "pointer";
+          const link = document.createElement("a");
+          link.id = "minimap-download-link";
+          link.textContent = "Save Your Race";
+          link.style.display = "block";
+          link.style.color = "#00ffff";
+          link.style.textDecoration = "none";
+          link.style.fontSize = "18px";
+          link.style.cursor = "pointer";
+          link.download = `fluxstream-race-${Date.now()}.png`;
+
+          container.appendChild(image);
+          container.appendChild(link);
+
+          // Stop propagation so clicking doesn't restart game
+          container.addEventListener("pointerdown", (e) => {
+            e.stopPropagation();
+          });
+
+          // Insert before subtitle
+          const menu = gameOverOverlay.querySelector(".menu");
+          menu.insertBefore(container, subtitle);
+        }
+
+        // Update the image and link
+        const image = document.getElementById("minimap-image");
+        const link = document.getElementById("minimap-download-link");
+        image.src = dataUrl;
+        link.href = dataUrl;
         link.download = `fluxstream-race-${Date.now()}.png`;
-
-        container.appendChild(image);
-        container.appendChild(link);
-
-        // Stop propagation so clicking doesn't restart game
-        container.addEventListener("pointerdown", (e) => {
-          e.stopPropagation();
-        });
-
-        // Insert before subtitle
-        const menu = gameOverOverlay.querySelector(".menu");
-        menu.insertBefore(container, subtitle);
-      }
-
-      // Update the image and link
-      const image = document.getElementById("minimap-image");
-      const link = document.getElementById("minimap-download-link");
-      image.src = dataUrl;
-      link.href = dataUrl;
-      link.download = `fluxstream-race-${Date.now()}.png`;
-    }).catch(err => {
-      console.error("Failed to generate minimap:", err);
-    });
+      })
+      .catch((err) => {
+        console.error("Failed to generate minimap:", err);
+      });
 
     gameOverOverlay.style.display = "flex";
   }
@@ -1418,8 +1526,10 @@
 
     // Update speeds (responsive to screen width with difficulty multiplier)
     // Base speed divided by 1.05 so momentum system brings it to normal
-    PLAYER_BASE_SPEED = (window.innerWidth * 0.0059 * DIFFICULTY_MULTIPLIER) / 1.05;
-    PLAYER_MAX_SPEED = (window.innerWidth * 0.008 * DIFFICULTY_MULTIPLIER) / 1.05;
+    PLAYER_BASE_SPEED =
+      (window.innerWidth * 0.0059 * DIFFICULTY_MULTIPLIER) / 1.05;
+    PLAYER_MAX_SPEED =
+      (window.innerWidth * 0.008 * DIFFICULTY_MULTIPLIER) / 1.05;
     RIVAL_BASE_SPEED = window.innerWidth * 0.006 * DIFFICULTY_MULTIPLIER;
     SLIPSTREAM_SPEED_INCREASE = PLAYER_BASE_SPEED * 0.0085;
     PLAYER_ACCEL_Y = PLAYER_BASE_SPEED * 0.042;
@@ -1442,8 +1552,14 @@
     }
 
     // --- Input Processing ---
-    const up = keys["ArrowUp"] || keys["KeyW"] || (activeTouches > 0 && keys["touchLeft"]);
-    const down = keys["ArrowDown"] || keys["KeyS"] || (activeTouches > 0 && keys["touchRight"]);
+    const up =
+      keys["ArrowUp"] ||
+      keys["KeyW"] ||
+      (activeTouches > 0 && keys["touchLeft"]);
+    const down =
+      keys["ArrowDown"] ||
+      keys["KeyS"] ||
+      (activeTouches > 0 && keys["touchRight"]);
     const boost = keys["Space"] || (keys["touchLeft"] && keys["touchRight"]);
 
     // Manual boost - consumes life (but can't use last life)
@@ -1481,100 +1597,114 @@
 
     // Only process player movement if not in penalty
     if (!playerInPenalty) {
+      // FAQ: "Your line's slope when moving up or down will be the same no matter how fast you are going"
+      // The slope is CAPPED at 45°, but accelerates smoothly to reach it
 
-    // FAQ: "Your line's slope when moving up or down will be the same no matter how fast you are going"
-    // The slope is CAPPED at 45°, but accelerates smoothly to reach it
+      const isTurning = up || down;
+      const isMovingHorizontal = Math.abs(player.vy) < 0.1;
 
-    const isTurning = up || down;
-    const isMovingHorizontal = Math.abs(player.vy) < 0.1;
-
-    // Apply acceleration with inertia
-    if (up) {
-      player.vy -= PLAYER_ACCEL_Y * delta;
-      player.lastMoveDirection = -1;
-    } else if (down) {
-      player.vy += PLAYER_ACCEL_Y * delta;
-      player.lastMoveDirection = 1;
-    } else {
-      // Return to horizontal when not turning (drift)
-      player.vy *= Math.pow(PLAYER_FRICTION_Y, delta);
-    }
-
-    // Clamp to 45° max slope (vy cannot exceed current speed)
-    player.vy = Math.max(-player.currentSpeed, Math.min(player.currentSpeed, player.vy));
-
-    // Speed momentum system: reward sustained horizontal movement
-    // Momentum ranges from 0.95 (just turned) to 1.05 (sustained horizontal = normal speed)
-    const MOMENTUM_BUILD_RATE = 0.003; // How fast momentum builds when horizontal
-    const MOMENTUM_DECAY_RATE = 0.04; // How fast momentum decays when turning
-    const MAX_MOMENTUM = 1.05;
-    const MIN_MOMENTUM = 0.95;
-
-    if (isMovingHorizontal && !isTurning) {
-      // Building momentum while moving straight
-      player.speedMomentum = Math.min(MAX_MOMENTUM, player.speedMomentum + MOMENTUM_BUILD_RATE * delta);
-    } else if (isTurning) {
-      // Lose momentum when turning
-      player.speedMomentum = Math.max(MIN_MOMENTUM, player.speedMomentum - MOMENTUM_DECAY_RATE * delta);
-    }
-    // When just coasting (not turning but not fully horizontal), momentum stays same
-
-    // Apply speed penalty when turning (FAQ: "Moving up or down will cause you to lose a little bit of speed")
-    if (isTurning) {
-      player.currentSpeed *= Math.pow(TURNING_SPEED_PENALTY, delta);
-    }
-
-    // Handle boost timer
-    if (player.boostTimer) {
-      player.boostTimer -= delta * (1000 / 60);
-      if (player.boostTimer <= 0) {
-        player.boostTimer = 0;
-        // Speed will return to normal via slipstream logic
+      // Apply acceleration with inertia
+      if (up) {
+        player.vy -= PLAYER_ACCEL_Y * delta;
+        player.lastMoveDirection = -1;
+      } else if (down) {
+        player.vy += PLAYER_ACCEL_Y * delta;
+        player.lastMoveDirection = 1;
       } else {
-        // Maintain boost speed
-        player.currentSpeed = BOOST_SPEED;
+        // Return to horizontal when not turning (drift)
+        player.vy *= Math.pow(PLAYER_FRICTION_Y, delta);
       }
-    }
 
-    // Update position (apply momentum multiplier to horizontal speed)
-    player.x += player.currentSpeed * player.speedMomentum * delta;
+      // Clamp to 45° max slope (vy cannot exceed current speed)
+      player.vy = Math.max(
+        -player.currentSpeed,
+        Math.min(player.currentSpeed, player.vy),
+      );
 
-    // If not actively turning, smoothly glide to target track
-    if (!up && !down) {
-      // Determine target track in the direction of last movement
-      let targetY = snapToTrackInDirection(player.y, player.lastMoveDirection);
-      let targetTrack = getTrackIndex(targetY);
+      // Speed momentum system: reward sustained horizontal movement
+      // Momentum ranges from 0.95 (just turned) to 1.05 (sustained horizontal = normal speed)
+      const MOMENTUM_BUILD_RATE = 0.003; // How fast momentum builds when horizontal
+      const MOMENTUM_DECAY_RATE = 0.04; // How fast momentum decays when turning
+      const MAX_MOMENTUM = 1.05;
+      const MIN_MOMENTUM = 0.95;
 
-      // If target track is occupied, keep searching in the SAME direction
-      if (isTrackOccupied(targetTrack, 'player', player.x)) {
-        // Search in the direction we were moving
-        const searchDirection = player.lastMoveDirection || 1; // Default to down if no direction
-        for (let offset = 1; offset <= 10; offset++) {
-          const nextTrack = targetTrack + (offset * searchDirection);
-          if (!isTrackOccupied(nextTrack, 'player', player.x)) {
-            targetTrack = nextTrack;
-            targetY = nextTrack * TRACK_SPACING - WORLD_HEIGHT / 2;
-            break;
-          }
+      if (isMovingHorizontal && !isTurning) {
+        // Building momentum while moving straight
+        player.speedMomentum = Math.min(
+          MAX_MOMENTUM,
+          player.speedMomentum + MOMENTUM_BUILD_RATE * delta,
+        );
+      } else if (isTurning) {
+        // Lose momentum when turning
+        player.speedMomentum = Math.max(
+          MIN_MOMENTUM,
+          player.speedMomentum - MOMENTUM_DECAY_RATE * delta,
+        );
+      }
+      // When just coasting (not turning but not fully horizontal), momentum stays same
+
+      // Apply speed penalty when turning (FAQ: "Moving up or down will cause you to lose a little bit of speed")
+      if (isTurning) {
+        player.currentSpeed *= Math.pow(TURNING_SPEED_PENALTY, delta);
+      }
+
+      // Handle boost timer
+      if (player.boostTimer) {
+        player.boostTimer -= delta * (1000 / 60);
+        if (player.boostTimer <= 0) {
+          player.boostTimer = 0;
+          // Speed will return to normal via slipstream logic
+        } else {
+          // Maintain boost speed
+          player.currentSpeed = BOOST_SPEED;
         }
       }
 
-      // Smoothly interpolate to target track
-      const snapSpeed = 0.15 * delta; // Smooth glide speed
-      player.y += (targetY - player.y) * snapSpeed;
+      // Update position (apply momentum multiplier to horizontal speed)
+      player.x += player.currentSpeed * player.speedMomentum * delta;
 
-      // Also decay velocity
-      player.vy *= Math.pow(PLAYER_FRICTION_Y, delta);
+      // If not actively turning, smoothly glide to target track
+      if (!up && !down) {
+        // Determine target track in the direction of last movement
+        let targetY = snapToTrackInDirection(
+          player.y,
+          player.lastMoveDirection,
+        );
+        let targetTrack = getTrackIndex(targetY);
 
-      // Lock to track when very close and not occupied
-      if (Math.abs(player.y - targetY) < 0.5 && !isTrackOccupied(targetTrack, 'player', player.x)) {
-        player.y = targetY;
-        player.vy = 0;
+        // If target track is occupied, keep searching in the SAME direction
+        if (isTrackOccupied(targetTrack, "player", player.x)) {
+          // Search in the direction we were moving
+          const searchDirection = player.lastMoveDirection || 1; // Default to down if no direction
+          for (let offset = 1; offset <= 10; offset++) {
+            const nextTrack = targetTrack + offset * searchDirection;
+            if (!isTrackOccupied(nextTrack, "player", player.x)) {
+              targetTrack = nextTrack;
+              targetY = nextTrack * TRACK_SPACING - WORLD_HEIGHT / 2;
+              break;
+            }
+          }
+        }
+
+        // Smoothly interpolate to target track
+        const snapSpeed = 0.15 * delta; // Smooth glide speed
+        player.y += (targetY - player.y) * snapSpeed;
+
+        // Also decay velocity
+        player.vy *= Math.pow(PLAYER_FRICTION_Y, delta);
+
+        // Lock to track when very close and not occupied
+        if (
+          Math.abs(player.y - targetY) < 0.5 &&
+          !isTrackOccupied(targetTrack, "player", player.x)
+        ) {
+          player.y = targetY;
+          player.vy = 0;
+        }
+      } else {
+        // Actively turning - free movement
+        player.y += player.vy * delta;
       }
-    } else {
-      // Actively turning - free movement
-      player.y += player.vy * delta;
-    }
     } // End of player movement (if not in penalty)
 
     // Update camera based on player's actual position (always, even during penalty)
@@ -1618,8 +1748,8 @@
 
         // For diagonal funnels, also check when inside (relX < 0 but > -funnelWidth)
         const shouldCheckObstacle = obs.isDiagonal
-          ? (relX < lookAheadDist && relX > -obs.funnelWidth)
-          : (relX > 0 && relX < lookAheadDist);
+          ? relX < lookAheadDist && relX > -obs.funnelWidth
+          : relX > 0 && relX < lookAheadDist;
 
         if (shouldCheckObstacle) {
           // Check if we're on collision course
@@ -1669,7 +1799,10 @@
               const entranceGapTop = obs.centerY - obs.gapSize / 2;
               const entranceGapBottom = obs.centerY + obs.gapSize / 2;
 
-              if (rival.y < entranceGapTop - 20 || rival.y > entranceGapBottom + 20) {
+              if (
+                rival.y < entranceGapTop - 20 ||
+                rival.y > entranceGapBottom + 20
+              ) {
                 willCollide = true;
               }
             }
@@ -1697,7 +1830,11 @@
           const distY = Math.abs(zone.y - rival.y);
 
           // Check if boost is ahead and within reasonable range
-          if (distX > 0 && distX < boostLookAheadDist && distY < WORLD_HEIGHT * 0.4) {
+          if (
+            distX > 0 &&
+            distX < boostLookAheadDist &&
+            distY < WORLD_HEIGHT * 0.4
+          ) {
             const totalDist = Math.sqrt(distX * distX + distY * distY);
             if (totalDist < closestBoostDist) {
               closestBoostDist = totalDist;
@@ -1707,7 +1844,10 @@
         }
 
         // If found a boost zone nearby, target it (responsive distance threshold)
-        if (closestBoostY !== null && closestBoostDist < app.screen.width * 0.4) {
+        if (
+          closestBoostY !== null &&
+          closestBoostDist < app.screen.width * 0.4
+        ) {
           targetY = closestBoostY;
           targetingBoost = true;
         }
@@ -1717,7 +1857,7 @@
 
       // Apply acceleration toward target
       // Use stronger acceleration when actively avoiding obstacles or targeting boosts
-      const accelStrength = mustAvoid ? 1.2 : (targetingBoost ? 0.8 : 0.5);
+      const accelStrength = mustAvoid ? 1.2 : targetingBoost ? 0.8 : 0.5;
       if (yDiff > 10) {
         rival.vy += PLAYER_ACCEL_Y * delta * accelStrength;
         rival.lastMoveDirection = 1;
@@ -1730,7 +1870,10 @@
       }
 
       // Clamp to fixed 45° slope
-      rival.vy = Math.max(-RIVAL_BASE_SPEED, Math.min(RIVAL_BASE_SPEED, rival.vy));
+      rival.vy = Math.max(
+        -RIVAL_BASE_SPEED,
+        Math.min(RIVAL_BASE_SPEED, rival.vy),
+      );
 
       // Check collision with obstacles BEFORE moving - pixel-based check
       const nextX = rival.x + RIVAL_BASE_SPEED * delta;
@@ -1739,9 +1882,10 @@
       const headX = nextX + TRAIL_WIDTH; // Front of bike
       const headY = nextY;
 
-      const aboutToHitObstacle = isRedPixelAt(headX, headY) ||
-                                  isRedPixelAt(headX + 2, headY + 2) ||
-                                  isRedPixelAt(headX + 2, headY - 2);
+      const aboutToHitObstacle =
+        isRedPixelAt(headX, headY) ||
+        isRedPixelAt(headX + 2, headY + 2) ||
+        isRedPixelAt(headX + 2, headY - 2);
 
       // If about to hit obstacle, apply penalty
       if (aboutToHitObstacle) {
@@ -1753,7 +1897,8 @@
         }
 
         // Position-based penalty: 800ms for 1st, 600ms otherwise
-        rival.penaltyTimer = rivalPosition === 1 ? LEADER_PENALTY_TIME : RIVAL_PENALTY_TIME;
+        rival.penaltyTimer =
+          rivalPosition === 1 ? LEADER_PENALTY_TIME : RIVAL_PENALTY_TIME;
         rival.sprite.alpha = 0.3; // Immediately show penalty
         return; // Don't move this frame
       }
@@ -1783,7 +1928,7 @@
           // Search in the direction we were moving
           const searchDirection = rival.lastMoveDirection || 1; // Default to down if no direction
           for (let offset = 1; offset <= 10; offset++) {
-            const nextTrack = targetTrack + (offset * searchDirection);
+            const nextTrack = targetTrack + offset * searchDirection;
             if (!isTrackOccupied(nextTrack, i, rival.x)) {
               targetTrack = nextTrack;
               targetY = nextTrack * TRACK_SPACING - WORLD_HEIGHT / 2;
@@ -1797,7 +1942,10 @@
         rival.y += (targetY - rival.y) * snapSpeed;
 
         // Lock to track when very close and not occupied
-        if (Math.abs(rival.y - targetY) < 0.5 && !isTrackOccupied(targetTrack, i, rival.x)) {
+        if (
+          Math.abs(rival.y - targetY) < 0.5 &&
+          !isTrackOccupied(targetTrack, i, rival.x)
+        ) {
           rival.y = targetY;
           rival.vy = 0;
         }
@@ -1808,13 +1956,17 @@
 
       // Keep within bounds (responsive margin)
       const boundaryMargin = WORLD_HEIGHT * 0.0625;
-      rival.y = Math.max(-WORLD_HEIGHT / 2 + boundaryMargin, Math.min(WORLD_HEIGHT / 2 - boundaryMargin, rival.y));
+      rival.y = Math.max(
+        -WORLD_HEIGHT / 2 + boundaryMargin,
+        Math.min(WORLD_HEIGHT / 2 - boundaryMargin, rival.y),
+      );
 
       // Update trail
       const trail = rivalTrails[i];
       if (
         trail.length === 0 ||
-        (rival.x - trail.at(-1).x) ** 2 + (rival.y - trail.at(-1).y) ** 2 > (TRAIL_WIDTH / 2) ** 2
+        (rival.x - trail.at(-1).x) ** 2 + (rival.y - trail.at(-1).y) ** 2 >
+          (TRAIL_WIDTH / 2) ** 2
       ) {
         trail.push(new PIXI.Point(rival.x, rival.y));
         if (trail.length > TRAIL_HISTORY) {
@@ -1834,7 +1986,9 @@
 
     if (
       trailPoints.length === 0 ||
-      (player.x - trailPoints.at(-1).x) ** 2 + (player.y - trailPoints.at(-1).y) ** 2 > (TRAIL_WIDTH / 2) ** 2
+      (player.x - trailPoints.at(-1).x) ** 2 +
+        (player.y - trailPoints.at(-1).y) ** 2 >
+        (TRAIL_WIDTH / 2) ** 2
     ) {
       trailPoints.push(new PIXI.Point(player.x, player.y));
       if (trailPoints.length > TRAIL_HISTORY) {
@@ -1862,15 +2016,16 @@
     positionTimeTracking[currentPosition - 1] += deltaMs;
 
     // Update UI
-    timeText.text = `${Math.floor(raceTimeRemaining / 1000)}:${String(Math.floor((raceTimeRemaining % 1000) / 10)).padStart(2, '0')}`;
-    const positionSuffix = ['st', 'nd', 'rd', 'th', 'th', 'th'];
+    timeText.text = `${Math.floor(raceTimeRemaining / 1000)}:${String(Math.floor((raceTimeRemaining % 1000) / 10)).padStart(2, "0")}`;
+    const positionSuffix = ["st", "nd", "rd", "th", "th", "th"];
     positionText.text = `${currentPosition}${positionSuffix[currentPosition - 1]}`;
 
     // Find closest pursuer (rival behind player)
     let closestPursuer = null;
     let closestDistance = Infinity;
     for (const rival of rivals) {
-      if (rival.x < player.x) { // Behind player
+      if (rival.x < player.x) {
+        // Behind player
         const distance = player.x - rival.x;
         if (distance < closestDistance) {
           closestDistance = distance;
@@ -1891,7 +2046,8 @@
     // Calculate and draw finish line when it comes into view
     // Estimate where player will be when time runs out based on current speed
     const secondsRemaining = raceTimeRemaining / 1000;
-    const estimatedFinishX = player.x + (player.currentSpeed * secondsRemaining * 60);
+    const estimatedFinishX =
+      player.x + player.currentSpeed * secondsRemaining * 60;
     drawFinishLine(estimatedFinishX);
 
     // End race when time runs out
@@ -1915,7 +2071,8 @@
 
     // Player tint for invincibility
     if (player.invincibilityTimer > 0) {
-      playerSprite.alpha = Math.floor(player.invincibilityTimer / 5) % 2 === 0 ? 0.5 : 1.0; // Flashing
+      playerSprite.alpha =
+        Math.floor(player.invincibilityTimer / 5) % 2 === 0 ? 0.5 : 1.0; // Flashing
     } else {
       playerSprite.alpha = 1.0;
     }
@@ -1944,9 +2101,12 @@
       if (i < speedLevel) {
         // Active dot - colored based on speed level
         let color;
-        if (speedLevel === 1) color = 0xff6666; // Red (slowed)
-        else if (speedLevel === 2) color = 0xffffff; // White (normal)
-        else if (speedLevel === 3) color = 0x00ff00; // Green (slipstream)
+        if (speedLevel === 1)
+          color = 0xff6666; // Red (slowed)
+        else if (speedLevel === 2)
+          color = 0xffffff; // White (normal)
+        else if (speedLevel === 3)
+          color = 0x00ff00; // Green (slipstream)
         else color = 0xff00ff; // Magenta (boost)
 
         speedIndicator.beginFill(color);
@@ -1981,7 +2141,7 @@
     // Allow right-click everywhere (for dev tools)
     if (e.button === 2) return;
     // Allow links to work
-    if (e.target.tagName === 'A' || e.target.closest('a')) {
+    if (e.target.tagName === "A" || e.target.closest("a")) {
       return;
     }
     e.preventDefault();

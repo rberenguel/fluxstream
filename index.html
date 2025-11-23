@@ -52,7 +52,7 @@
         text-align: center;
       }
       .splash-content .subtitle {
-        font-family: 'Inter', sans-serif;
+        font-family: "Inter", sans-serif;
         font-size: clamp(10px, 1.8vh, 14px);
         color: #888888;
         margin-bottom: clamp(20px, 4vh, 40px);
@@ -145,6 +145,43 @@
       .menu p {
         font-size: clamp(16px, 3vw, 24px);
       }
+      #countdown-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(5, 5, 10, 0.9);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 10003;
+      }
+      #countdown-overlay.active {
+        display: flex;
+      }
+      #countdown-number {
+        font-family: "Sixtyfour", sans-serif;
+        font-size: clamp(96px, 25vh, 200px);
+        color: #00ffff;
+        text-shadow:
+          0 0 20px #00ffff,
+          0 0 40px #00ffff;
+        animation: countdown-pulse 1s ease-out;
+      }
+      @keyframes countdown-pulse {
+        0% {
+          transform: scale(0.5);
+          opacity: 0;
+        }
+        50% {
+          transform: scale(1.1);
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
     </style>
     <script src="libs/pixi8.1.5.min.js"></script>
   </head>
@@ -152,7 +189,15 @@
     <div id="splash-screen">
       <div class="splash-content">
         <h1>FLUXSTREAM</h1>
-        <p class="subtitle">inspired by <a href="https://en.wikipedia.org/wiki/Bit_Generations" target="_blank" rel="noopener">bit generations: dotstream</a></p>
+        <p class="subtitle">
+          inspired by
+          <a
+            href="https://en.wikipedia.org/wiki/Bit_Generations"
+            target="_blank"
+            rel="noopener"
+            >bit generations: dotstream</a
+          >
+        </p>
         <div class="instructions">
           <p><span>MOVE</span><span>ARROWS / TAP SIDES</span></p>
           <p><span>BOOST</span><span>SPACE / TAP BOTH</span></p>
@@ -161,6 +206,9 @@
         </div>
         <p class="start-prompt">TAP ANYWHERE TO START</p>
       </div>
+    </div>
+    <div id="countdown-overlay">
+      <div id="countdown-number">3</div>
     </div>
     <div id="slipstream-vignette"></div>
     <div id="pause-overlay" class="overlay">
@@ -176,5 +224,24 @@
       </div>
     </div>
     <script src="main.js"></script>
+        <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("./sw.js").then(
+            function (registration) {
+              console.log(
+                "ServiceWorker registration successful with scope: ",
+                registration.scope,
+              );
+            },
+            function (err) {
+              console.log("ServiceWorker registration failed: ", err);
+            },
+          );
+        });
+      } else {
+        console.info("Service workers not available on this device");
+      }
+    </script>
   </body>
 </html>
