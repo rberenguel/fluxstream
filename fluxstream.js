@@ -41,7 +41,8 @@
   // Rivals
   const NUM_RIVALS = 5;
   const RIVAL_SPACING = TRAIL_WIDTH * 2; // Minimum spacing between players
-  const RIVAL_PENALTY_TIME = 800; // ms penalty when hitting obstacle
+  const LEADER_PENALTY_TIME = 800; // ms penalty for 1st place
+  const RIVAL_PENALTY_TIME = 600; // ms penalty for everyone else
 
   // Slipstream mechanic
   const SLIPSTREAM_RANGE = RIVAL_SPACING * 1.5; // Must be larger than spacing to allow slipstream
@@ -527,8 +528,16 @@
       return;
     }
 
-    // Apply penalty like rivals - pause and teleport
-    player.penaltyTimer = RIVAL_PENALTY_TIME;
+    // Calculate position - check if player is in 1st place
+    let position = 1;
+    for (const rival of rivals) {
+      if (rival.x > player.x) {
+        position++;
+      }
+    }
+
+    // Apply position-based penalty: 800ms for 1st, 600ms otherwise
+    player.penaltyTimer = position === 1 ? LEADER_PENALTY_TIME : RIVAL_PENALTY_TIME;
     player.sprite.alpha = 0.3;
   }
 
@@ -1104,7 +1113,15 @@
 
       // If about to hit obstacle, apply penalty
       if (aboutToHitObstacle) {
-        rival.penaltyTimer = RIVAL_PENALTY_TIME; // 200ms penalty
+        // Calculate this rival's position
+        let rivalPosition = 1;
+        if (player.x > rival.x) rivalPosition++;
+        for (const otherRival of rivals) {
+          if (otherRival.x > rival.x) rivalPosition++;
+        }
+
+        // Position-based penalty: 800ms for 1st, 600ms otherwise
+        rival.penaltyTimer = rivalPosition === 1 ? LEADER_PENALTY_TIME : RIVAL_PENALTY_TIME;
         rival.sprite.alpha = 0.3; // Immediately show penalty
         return; // Don't move this frame
       }
