@@ -41,10 +41,10 @@
         text-align: center;
       }
       .splash-content h1 {
-        font-size: clamp(48px, 12vw, 96px);
+        font-size: clamp(32px, 8vh, 72px);
         color: #00ffff;
         margin: auto;
-        margin-bottom: 40px;
+        margin-bottom: clamp(15px, 3vh, 30px);
         text-shadow:
           0 0 5px #ffff0055,
           0 0 8px #ffff00;
@@ -55,18 +55,18 @@
       }
       .splash-content .instructions {
         font-family: monospace;
-        font-size: clamp(14px, 3vw, 16px);
+        font-size: clamp(11px, 2vh, 14px);
         color: #cccccc;
         display: inline-block;
         border: 1px solid #40406a;
-        padding: 20px 30px;
+        padding: clamp(10px, 2vh, 20px) clamp(15px, 3vw, 30px);
         background: rgba(10, 10, 20, 0.3);
       }
       .splash-content .instructions p {
-        margin: 12px 0;
+        margin: clamp(6px, 1.5vh, 10px) 0;
         display: grid;
-        grid-template-columns: 120px auto;
-        gap: 20px;
+        grid-template-columns: clamp(80px, 15vw, 120px) auto;
+        gap: clamp(10px, 2vw, 20px);
         text-align: left;
       }
       .splash-content .instructions p span:first-child {
@@ -75,8 +75,8 @@
         text-align: right;
       }
       .splash-content .start-prompt {
-        margin-top: 50px;
-        font-size: clamp(18px, 3vw, 24px);
+        margin-top: clamp(20px, 4vh, 40px);
+        font-size: clamp(14px, 2.5vh, 20px);
         color: #ffffff;
         animation: blink 1.5s infinite ease-in-out;
       }

@@ -112,7 +112,7 @@
   // --- UI Objects ---
   let slipstreamBar, slipstreamBarFill;
   let pauseOverlay, gameOverOverlay, splashScreenElement, vignetteElement;
-  let livesText, timeText, positionText;
+  let livesText, timeText, positionText, pursuerText;
 
   // --- Game State ---
   let player;
@@ -169,15 +169,19 @@
     slipstreamBarFill = new PIXI.Graphics();
     app.stage.addChild(slipstreamBarFill);
 
-    // Lives indicator
+    // Lives indicator (responsive font size)
+    const mainFontSize = Math.max(20, Math.min(32, app.screen.height * 0.04));
+    const subFontSize = Math.max(16, Math.min(24, app.screen.height * 0.03));
+    const smallFontSize = Math.max(14, Math.min(18, app.screen.height * 0.025));
+
     livesText = new PIXI.Text({
       text: "3",
       style: new PIXI.TextStyle({
         fontFamily: "Sixtyfour",
-        fontSize: 32,
+        fontSize: mainFontSize,
         fontWeight: "bold",
         fill: 0xffffff,
-        stroke: { color: 0x000000, width: 4 },
+        stroke: { color: 0x000000, width: Math.max(3, mainFontSize * 0.125) },
       }),
     });
     livesText.anchor.set(0, 0);
@@ -190,10 +194,10 @@
       text: "1:00",
       style: new PIXI.TextStyle({
         fontFamily: "Sixtyfour",
-        fontSize: 32,
+        fontSize: mainFontSize,
         fontWeight: "bold",
         fill: 0xffffff,
-        stroke: { color: 0x000000, width: 4 },
+        stroke: { color: 0x000000, width: Math.max(3, mainFontSize * 0.125) },
       }),
     });
     timeText.anchor.set(1, 0);
@@ -206,16 +210,32 @@
       text: "6th",
       style: new PIXI.TextStyle({
         fontFamily: "Sixtyfour",
-        fontSize: 24,
+        fontSize: subFontSize,
         fontWeight: "bold",
         fill: 0xffff00,
-        stroke: { color: 0x000000, width: 3 },
+        stroke: { color: 0x000000, width: Math.max(2, subFontSize * 0.125) },
       }),
     });
     positionText.anchor.set(0, 0);
     positionText.x = 20;
-    positionText.y = 60;
+    positionText.y = 20 + mainFontSize + 10;
     app.stage.addChild(positionText);
+
+    // Pursuer indicator (shows closest rival behind)
+    pursuerText = new PIXI.Text({
+      text: "",
+      style: new PIXI.TextStyle({
+        fontFamily: "Sixtyfour",
+        fontSize: smallFontSize,
+        fontWeight: "bold",
+        fill: 0xff6666,
+        stroke: { color: 0x000000, width: Math.max(2, smallFontSize * 0.125) },
+      }),
+    });
+    pursuerText.anchor.set(1, 0);
+    pursuerText.x = app.screen.width - 20;
+    pursuerText.y = 20 + mainFontSize + 10;
+    app.stage.addChild(pursuerText);
 
     // Get overlays and vignette
     pauseOverlay = document.getElementById("pause-overlay");
@@ -1711,6 +1731,28 @@
     timeText.text = `${Math.floor(raceTimeRemaining / 1000)}:${String(Math.floor((raceTimeRemaining % 1000) / 10)).padStart(2, '0')}`;
     const positionSuffix = ['st', 'nd', 'rd', 'th', 'th', 'th'];
     positionText.text = `${currentPosition}${positionSuffix[currentPosition - 1]}`;
+
+    // Find closest pursuer (rival behind player)
+    let closestPursuer = null;
+    let closestDistance = Infinity;
+    for (const rival of rivals) {
+      if (rival.x < player.x) { // Behind player
+        const distance = player.x - rival.x;
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestPursuer = rival;
+        }
+      }
+    }
+
+    // Update pursuer indicator
+    if (closestPursuer) {
+      // Calculate time gap based on current speeds
+      const timeGap = closestDistance / player.currentSpeed / 60; // Convert to seconds
+      pursuerText.text = `↓ ${timeGap.toFixed(1)}s`;
+    } else {
+      pursuerText.text = ""; // No pursuers
+    }
 
     // Calculate and draw finish line when it comes into view
     // Estimate where player will be when time runs out based on current speed
