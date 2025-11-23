@@ -76,6 +76,9 @@
   const boundaryGraphics = new PIXI.Graphics();
   world.addChild(boundaryGraphics);
 
+  const finishLineGraphics = new PIXI.Graphics();
+  world.addChild(finishLineGraphics);
+
   const trailGraphics = new PIXI.Graphics();
   world.addChild(trailGraphics);
 
@@ -115,6 +118,7 @@
   let obstacles = [];
   let allEncounteredObstacles = []; // Track all obstacles for minimap (never cleaned up)
   let boostZones = []; // Boost pickups on track
+  let allEncounteredBoostZones = []; // Track all boost zones for minimap (never cleaned up)
   let gameState = "splash"; // splash, playing, paused, gameOver
   let keys = {};
   let activeTouches = 0;
@@ -262,6 +266,47 @@
       width: boundaryWidth,
       color: boundaryColor,
       alpha: 0.8,
+    });
+  }
+
+  function drawFinishLine(finishX) {
+    finishLineGraphics.clear();
+
+    // Check if finish line is within visible range
+    const visibleStart = cameraX - 100;
+    const visibleEnd = cameraX + app.screen.width + CAMERA_BUFFER;
+
+    if (finishX < visibleStart || finishX > visibleEnd) {
+      return; // Not visible yet
+    }
+
+    // Draw a stylish finish line area
+    const lineWidth = 20;
+    const checkeredSize = 40;
+
+    // Draw checkered pattern
+    for (let y = -WORLD_HEIGHT / 2; y < WORLD_HEIGHT / 2; y += checkeredSize) {
+      const offset = Math.floor(y / checkeredSize) % 2 === 0 ? 0 : checkeredSize / 2;
+      for (let x = 0; x < lineWidth; x += checkeredSize) {
+        const color = Math.floor((x + offset) / checkeredSize) % 2 === 0 ? 0xffffff : 0x000000;
+        finishLineGraphics.beginFill(color, 0.6);
+        finishLineGraphics.drawRect(
+          finishX - lineWidth / 2 + x,
+          y,
+          checkeredSize,
+          checkeredSize
+        );
+        finishLineGraphics.endFill();
+      }
+    }
+
+    // Draw bright cyan border
+    finishLineGraphics.moveTo(finishX, -WORLD_HEIGHT / 2);
+    finishLineGraphics.lineTo(finishX, WORLD_HEIGHT / 2);
+    finishLineGraphics.stroke({
+      width: 3,
+      color: 0x00ffff,
+      alpha: 0.9,
     });
   }
 
@@ -546,6 +591,13 @@
       collectedBy: [] // Track which racers have collected this boost
     });
 
+    // Store for minimap
+    allEncounteredBoostZones.push({
+      x: spawnX,
+      y: spawnY,
+      collectedBy: [] // Will be updated as racers collect it
+    });
+
     obstacleContainer.addChild(zone);
   }
 
@@ -577,13 +629,19 @@
   }
 
   function checkBoostZoneCollisions() {
-    for (const zone of boostZones) {
+    for (let zoneIdx = 0; zoneIdx < boostZones.length; zoneIdx++) {
+      const zone = boostZones[zoneIdx];
+
+      // Find corresponding entry in allEncounteredBoostZones
+      const allZone = allEncounteredBoostZones.find(z => z.x === zone.x && z.y === zone.y);
+
       // Check player collision
       const playerDist = Math.sqrt((player.x - zone.x) ** 2 + (player.y - zone.y) ** 2);
       if (playerDist < BOOST_ZONE_SIZE / 2 + TRAIL_WIDTH) {
         // Only collect if player hasn't already collected this zone
         if (!zone.collectedBy.includes('player')) {
           zone.collectedBy.push('player');
+          if (allZone) allZone.collectedBy.push('player');
           activateBoost(player);
         }
       }
@@ -597,6 +655,7 @@
           // Only collect if this rival hasn't already collected this zone
           if (!zone.collectedBy.includes(rivalId) && !rival.boostTimer) {
             zone.collectedBy.push(rivalId);
+            if (allZone) allZone.collectedBy.push(rivalId);
             rival.boostTimer = BOOST_DURATION;
           }
         }
@@ -807,10 +866,14 @@
     splashScreenElement.style.display = "none";
     gameOverOverlay.style.display = "none";
 
-    // Initialize player
+    // Initialize player at first position in diagonal
+    const startX = 100;
+    const horizontalSpacing = 150;
+    const verticalSpacing = 100;
+
     player = {
-      x: 100,
-      y: 0,
+      x: startX,
+      y: -NUM_RIVALS / 2 * verticalSpacing,
       vy: 0, // Y velocity
       currentSpeed: PLAYER_BASE_SPEED, // Current horizontal speed (varies)
       lastMoveDirection: 0, // Track last Y movement direction for trail push
@@ -825,7 +888,7 @@
 
     trailPoints = [new PIXI.Point(player.x, player.y)];
 
-    // Initialize rivals (dummy straight-ahead)
+    // Initialize rivals in diagonal formation behind player
     rivals = [];
     rivalTrails = [];
 
@@ -836,8 +899,8 @@
       world.addChild(rivalSprite);
 
       const rival = {
-        x: 200 + i * 150,
-        y: ((i - NUM_RIVALS / 2) * 100),
+        x: startX + (i + 1) * horizontalSpacing,
+        y: player.y + (i + 1) * verticalSpacing,
         vy: 0,
         lastMoveDirection: 0, // Track last Y movement direction
         color: rivalColor,
@@ -852,7 +915,9 @@
     obstacles = [];
     allEncounteredObstacles = [];
     boostZones = [];
+    allEncounteredBoostZones = [];
     obstacleContainer.removeChildren();
+    finishLineGraphics.clear();
     cameraX = 0;
     slipstreamGauge = 0;
     slipstreamActive = false;
@@ -954,8 +1019,8 @@
       }
     }
 
-    // Render boost zones
-    for (const zone of boostZones) {
+    // Render boost zones (use allEncounteredBoostZones to show entire race)
+    for (const zone of allEncounteredBoostZones) {
       const x = transformX(zone.x);
       const y = transformY(zone.y);
       const size = BOOST_ZONE_SIZE * scale;
@@ -1615,6 +1680,12 @@
     timeText.text = `${Math.floor(raceTimeRemaining / 1000)}:${String(Math.floor((raceTimeRemaining % 1000) / 10)).padStart(2, '0')}`;
     const positionSuffix = ['st', 'nd', 'rd', 'th', 'th', 'th'];
     positionText.text = `${currentPosition}${positionSuffix[currentPosition - 1]}`;
+
+    // Calculate and draw finish line when it comes into view
+    // Estimate where player will be when time runs out based on current speed
+    const secondsRemaining = raceTimeRemaining / 1000;
+    const estimatedFinishX = player.x + (player.currentSpeed * secondsRemaining * 60);
+    drawFinishLine(estimatedFinishX);
 
     // End race when time runs out
     if (raceTimeRemaining <= 0) {
