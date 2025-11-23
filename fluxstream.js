@@ -3,7 +3,7 @@
   const PLAYER_BASE_SPEED = 6.0; // Base horizontal speed (increases with slipstream)
   const PLAYER_MAX_SPEED = 8.0; // Maximum speed when slipstreaming
   const TURNING_SPEED_PENALTY = 0.98; // Speed multiplier when turning (slight slowdown)
-  const SLIPSTREAM_SPEED_INCREASE = 0.015; // How fast speed builds when slipstreaming
+  const SLIPSTREAM_SPEED_INCREASE = 0.05; // How fast speed builds when slipstreaming
   const SPEED_DECAY = 0.99; // How fast speed returns to base when not slipstreaming
 
   const PLAYER_ACCEL_Y = 0.25; // Y-axis acceleration when input is held
@@ -30,16 +30,16 @@
   const GRID_SIZE = 50;
   const GRID_COLOR = 0x40406a;
 
+  // Rivals
+  const NUM_RIVALS = 5;
+  const RIVAL_SPACING = TRAIL_WIDTH * 2; // Minimum spacing between players
+  const RIVAL_PENALTY_TIME = 400; // ms penalty when hitting obstacle
+
   // Slipstream mechanic
-  const SLIPSTREAM_RANGE = 3; // pixels tolerance for alignment
+  const SLIPSTREAM_RANGE = RIVAL_SPACING * 1.5; // Must be larger than spacing to allow slipstream
   const SLIPSTREAM_FILL_RATE = 0.5; // per frame
   const SLIPSTREAM_MAX = 100;
   const SLIPSTREAM_BOOST = 1.5; // speed multiplier
-
-  // Rivals
-  const NUM_RIVALS = 5;
-  const RIVAL_SPACING = TRAIL_WIDTH * 1.5; // Minimum spacing between players (1 line-width)
-  const RIVAL_PENALTY_TIME = 200; // ms penalty when hitting obstacle
 
   // Lives/Turbo system (like Dotstream)
   const STARTING_LIVES = 3;
@@ -256,8 +256,8 @@
 
     } else {
       // Diagonal funnel - 45° angled walls creating a diagonal passage
-      const angleUp = Math.random() < 0.5;
-      const centerY = (Math.random() - 0.5) * WORLD_HEIGHT * 0.3;
+      const angleUp = Math.random() < 0.5; // Randomize direction
+      const centerY = (Math.random() - 0.5) * WORLD_HEIGHT * 0.4; // More vertical variation
       const funnelWidth = 300;
 
       // Create angled walls as filled polygons
@@ -366,10 +366,10 @@
 
     // Progressive difficulty - spawn rate increases slowly over time
     obstacleDifficulty += 0.00001;
-    const spawnChance = Math.min(0.008 + obstacleDifficulty, 0.02); // Cap at 0.02
+    const spawnChance = Math.min(0.003 + obstacleDifficulty, 0.01); // Cap at 0.01, start lower
 
-    // Enforce minimum spacing between obstacles
-    const minSpacing = 1200; // Minimum distance between obstacles
+    // Enforce minimum spacing between obstacles - much larger gap
+    const minSpacing = 2500; // Much larger minimum distance
     const spawnX = cameraX + app.screen.width + CAMERA_BUFFER;
     const distanceSinceLastObstacle = spawnX - lastObstacleX;
 
@@ -811,41 +811,74 @@
     }
 
     // Update camera based on player's actual position
-    cameraX = player.x - 100; // Keep player slightly left of center
+    cameraX = player.x - app.screen.width * 0.3; // Keep player at 30% from left (closer to center)
 
     // --- Rival Physics (Using same physics as player) ---
 
     rivals.forEach((rival, i) => {
-      // AI: Look ahead for obstacles and navigate
-      let targetY = Math.sin(rival.x * 0.008 + i) * (WORLD_HEIGHT * 0.3); // Default sine wave
+      // AI: Stay mostly horizontal unless avoiding obstacles
+      let targetY = rival.y; // Default: maintain current Y position
 
-      // Look ahead for obstacles and find the gap
-      const lookAheadDist = 300;
-      let gapFound = false;
+      // Look ahead for obstacles we WILL collide with
+      const lookAheadDist = 800;
+      let mustAvoid = false;
 
       for (const obs of obstacles) {
         if (!obs.isWall) continue;
 
-        // Check if obstacle is ahead
-        if (obs.x > rival.x && obs.x < rival.x + lookAheadDist) {
-          if (obs.wallBounds) {
-            // Rectangular wall - determine if it's top or bottom
-            const bounds = obs.wallBounds;
-            const worldY = obs.y + bounds.y;
+        // Check if obstacle is directly ahead
+        const relX = obs.x - rival.x;
+        if (relX > 0 && relX < lookAheadDist) {
+          // Check if we're on collision course
+          let willCollide = false;
 
-            if (worldY < 0) {
-              // Top wall - navigate toward bottom half (positive Y)
-              targetY = 50 + (i - NUM_RIVALS / 2) * TRAIL_WIDTH * 2;
-              gapFound = true;
-            } else {
-              // Bottom wall - navigate toward top half (negative Y)
-              targetY = -50 + (i - NUM_RIVALS / 2) * TRAIL_WIDTH * 2;
-              gapFound = true;
+          if (obs.wallBounds) {
+            // Rectangular obstacle
+            const bounds = obs.wallBounds;
+            const obsWorldY = obs.y + bounds.y;
+            const obsTop = obsWorldY;
+            const obsBottom = obsWorldY + bounds.height;
+
+            // Will we hit this wall at our current Y?
+            if (rival.y >= obsTop && rival.y <= obsBottom) {
+              willCollide = true;
+              // Navigate to the gap - top or bottom wall determines which side is clear
+              if (obsWorldY < 0) {
+                targetY = 0; // Top wall, go to center/bottom
+              } else {
+                targetY = 0; // Bottom wall, go to center/top
+              }
             }
           } else if (obs.isDiagonal) {
-            // Diagonal wall - aim for the gap center with slight offset per rival
-            targetY = obs.centerY + (i - NUM_RIVALS / 2) * TRAIL_WIDTH * 2;
-            gapFound = true;
+            // Diagonal funnel - check if we'll pass through the gap
+            // The gap is at obs.centerY with height obs.gapSize
+            const gapTop = obs.centerY - obs.gapSize / 2;
+            const gapBottom = obs.centerY + obs.gapSize / 2;
+
+            // If we're not aligned with the gap, we'll collide
+            if (rival.y < gapTop || rival.y > gapBottom) {
+              willCollide = true;
+              // Navigate to gap center, spread out rivals
+              targetY = obs.centerY + (i - NUM_RIVALS / 2) * TRAIL_WIDTH * 2;
+
+              // If funnel slopes up/down, adjust strategy
+              if (obs.angleUp) {
+                // Funnel slopes upward, may need to move diagonally with it
+                if (relX < obs.funnelWidth * 0.5) {
+                  targetY = obs.centerY + (relX / obs.funnelWidth) * 100; // Gradual approach
+                }
+              } else {
+                // Funnel slopes downward
+                if (relX < obs.funnelWidth * 0.5) {
+                  targetY = obs.centerY - (relX / obs.funnelWidth) * 100; // Gradual approach
+                }
+              }
+            }
+          }
+
+          if (willCollide) {
+            mustAvoid = true;
+            break; // React to first obstacle
           }
         }
       }
@@ -873,9 +906,24 @@
         rival.sprite.alpha = 0.3; // Semi-transparent during penalty
 
         if (rival.penaltyTimer <= 0) {
-          // End penalty
+          // End penalty - teleport past the obstacle
           rival.penaltyTimer = null;
           rival.sprite.alpha = 1;
+
+          // Find the obstacle they hit and jump past it
+          let jumpDistance = 350; // Default jump
+          for (const obs of obstacles) {
+            if (Math.abs(obs.x - rival.x) < 100) {
+              // This is the obstacle we hit
+              if (obs.funnelWidth) {
+                jumpDistance = obs.funnelWidth + 50; // Jump past funnel width
+              } else if (obs.wallBounds) {
+                jumpDistance = obs.wallBounds.width + 50; // Jump past wall width
+              }
+              break;
+            }
+          }
+          rival.x += jumpDistance;
         }
         // DO NOT MOVE during penalty - just skip this frame
         return;
