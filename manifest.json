@@ -1,13 +1,13 @@
 {
-  "name": "flux",
-  "short_name": "flux",
+  "name": "Fluxstream",
+  "short_name": "Fluxstream",
   "author": "Ruben Berenguel",
-  "version": "0.1.2",
-  "description": "Like the movie and the snake.s",
+  "version": "1.0.0",
+  "description": "High-speed racing game with track-based positioning and slipstream mechanics",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#05050a",
+  "theme_color": "#00ffff",
   "icons": [
     {
       "src": "./media/icon.png",
