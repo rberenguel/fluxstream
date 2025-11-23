@@ -88,6 +88,20 @@
   const playerSprite = new PIXI.Graphics();
   world.addChild(playerSprite);
 
+  // Minimap for race summary image
+  const MINIMAP_MAX_HEIGHT = 400; // Max height for minimap
+  const minimapContainer = new PIXI.Container();
+  const minimapBackground = new PIXI.Graphics();
+  const minimapTrails = new PIXI.Graphics();
+  const minimapObstacles = new PIXI.Graphics();
+  const minimapBoosts = new PIXI.Graphics();
+  minimapContainer.addChild(minimapBackground);
+  minimapContainer.addChild(minimapObstacles);
+  minimapContainer.addChild(minimapBoosts);
+  minimapContainer.addChild(minimapTrails);
+  minimapContainer.visible = false; // Hidden, only for capture
+  app.stage.addChild(minimapContainer);
+
   // --- UI Objects ---
   let slipstreamBar, slipstreamBarFill;
   let pauseOverlay, gameOverOverlay, splashScreenElement, vignetteElement;
@@ -825,6 +839,153 @@
     gameState = "playing";
   }
 
+  // --- Minimap Rendering ---
+
+  function renderMinimap() {
+    // Calculate world bounds from all trails and entities
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+
+    // Include player trail
+    for (const point of trailPoints) {
+      if (point.x < minX) minX = point.x;
+      if (point.x > maxX) maxX = point.x;
+      if (point.y < minY) minY = point.y;
+      if (point.y > maxY) maxY = point.y;
+    }
+
+    // Include rival trails
+    for (const trail of rivalTrails) {
+      for (const point of trail) {
+        if (point.x < minX) minX = point.x;
+        if (point.x > maxX) maxX = point.x;
+        if (point.y < minY) minY = point.y;
+        if (point.y > maxY) maxY = point.y;
+      }
+    }
+
+    // Add padding to bounds
+    const padding = 50;
+    minX -= padding;
+    maxX += padding;
+    minY -= padding;
+    maxY += padding;
+
+    // Calculate dimensions maintaining aspect ratio
+    const worldWidth = maxX - minX;
+    const worldHeight = maxY - minY;
+    const aspectRatio = worldWidth / worldHeight;
+
+    // Use fixed height, calculate width based on aspect ratio
+    const minimapHeight = MINIMAP_MAX_HEIGHT;
+    const minimapWidth = minimapHeight * aspectRatio;
+    const scale = minimapHeight / worldHeight;
+
+    // Transform functions
+    const transformX = (worldX) => (worldX - minX) * scale;
+    const transformY = (worldY) => (worldY - minY) * scale;
+
+    // Clear all graphics
+    minimapBackground.clear();
+    minimapObstacles.clear();
+    minimapBoosts.clear();
+    minimapTrails.clear();
+
+    // Render background
+    minimapBackground.beginFill(0x05050a, 1);
+    minimapBackground.drawRect(0, 0, minimapWidth, minimapHeight);
+    minimapBackground.endFill();
+
+    // Render obstacles
+    for (const obs of obstacles) {
+      if (obs.isDiagonal && obs.polygonVertices) {
+        // Render diagonal obstacle as polygon
+        const points = [];
+        for (const vertex of obs.polygonVertices) {
+          points.push(new PIXI.Point(
+            transformX(obs.x + vertex.x),
+            transformY(obs.y + vertex.y)
+          ));
+        }
+        minimapObstacles.beginFill(OBSTACLE_COLOR);
+        minimapObstacles.drawPolygon(points);
+        minimapObstacles.endFill();
+      } else if (obs.wallBounds) {
+        // Render rectangular obstacle
+        const bounds = obs.wallBounds;
+        const x = transformX(obs.x + bounds.x);
+        const y = transformY(obs.y + bounds.y);
+        const width = bounds.width * scale;
+        const height = bounds.height * scale;
+        minimapObstacles.beginFill(OBSTACLE_COLOR);
+        minimapObstacles.drawRect(x, y, width, height);
+        minimapObstacles.endFill();
+      }
+    }
+
+    // Render boost zones
+    for (const zone of boostZones) {
+      const x = transformX(zone.x);
+      const y = transformY(zone.y);
+      const size = BOOST_ZONE_SIZE * scale;
+      minimapBoosts.beginFill(0x00ff00, zone.collected ? 0.3 : 0.7);
+      minimapBoosts.drawRect(x - size / 2, y - size / 2, size, size);
+      minimapBoosts.endFill();
+    }
+
+    // Render rival trails
+    for (let i = 0; i < rivalTrails.length; i++) {
+      const trail = rivalTrails[i];
+      const rival = rivals[i];
+      if (trail && trail.length > 1) {
+        minimapTrails.moveTo(transformX(trail[0].x), transformY(trail[0].y));
+        for (let j = 1; j < trail.length; j++) {
+          minimapTrails.lineTo(transformX(trail[j].x), transformY(trail[j].y));
+        }
+        minimapTrails.stroke({
+          width: Math.max(1, TRAIL_WIDTH * scale * 0.8),
+          color: rival.color,
+          cap: "round",
+          join: "round",
+        });
+      }
+    }
+
+    // Render player trail (on top)
+    if (trailPoints.length > 1) {
+      minimapTrails.moveTo(transformX(trailPoints[0].x), transformY(trailPoints[0].y));
+      for (let i = 1; i < trailPoints.length; i++) {
+        minimapTrails.lineTo(transformX(trailPoints[i].x), transformY(trailPoints[i].y));
+      }
+      minimapTrails.stroke({
+        width: Math.max(1.5, TRAIL_WIDTH * scale),
+        color: PLAYER_COLOR,
+        cap: "round",
+        join: "round",
+      });
+    }
+  }
+
+  async function captureMinimapImage() {
+    // Make minimap visible for capture
+    minimapContainer.visible = true;
+
+    // Render the minimap
+    renderMinimap();
+
+    // Wait for next frame to ensure rendering is complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Extract as canvas
+    const canvas = app.renderer.extract.canvas(minimapContainer);
+
+    // Hide minimap again
+    minimapContainer.visible = false;
+
+    // Convert to data URL
+    return canvas.toDataURL('image/png');
+  }
+
   function endGame(raceFinished = false) {
     if (gameState === "gameOver") return;
     gameState = "gameOver";
@@ -848,6 +1009,38 @@
     }
     resultsHTML += "<br/>Tap to Restart";
     subtitle.innerHTML = resultsHTML;
+
+    // Generate and add minimap image
+    captureMinimapImage().then(dataUrl => {
+      // Add image to game over screen
+      let minimapImg = document.getElementById("minimap-image");
+      if (!minimapImg) {
+        minimapImg = document.createElement("img");
+        minimapImg.id = "minimap-image";
+        minimapImg.style.maxWidth = "90%";
+        minimapImg.style.maxHeight = "400px";
+        minimapImg.style.marginTop = "20px";
+        minimapImg.style.border = "2px solid #40406a";
+        minimapImg.style.cursor = "pointer";
+        minimapImg.title = "Click to download";
+
+        // Add download functionality
+        minimapImg.addEventListener("click", (e) => {
+          e.stopPropagation(); // Don't restart game when clicking image
+          const link = document.createElement("a");
+          link.download = `fluxstream-race-${Date.now()}.png`;
+          link.href = dataUrl;
+          link.click();
+        });
+
+        // Insert before subtitle
+        const menu = gameOverOverlay.querySelector(".menu");
+        menu.insertBefore(minimapImg, subtitle);
+      }
+      minimapImg.src = dataUrl;
+    }).catch(err => {
+      console.error("Failed to generate minimap:", err);
+    });
 
     gameOverOverlay.style.display = "flex";
   }
