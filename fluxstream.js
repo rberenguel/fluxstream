@@ -15,12 +15,12 @@
   // This creates the distinctive Dotstream feel
   const MOVEMENT_ANGLE_QUANTIZE = true;
 
-  const TRAIL_WIDTH = 4;
+  // Responsive sizing based on screen dimensions
+  let WORLD_HEIGHT = window.innerHeight * 0.8; // Vertical play area (80% of screen height)
+  let CAMERA_BUFFER = window.innerWidth * 0.3; // How far ahead to spawn obstacles
+  let TRAIL_WIDTH = Math.max(3, WORLD_HEIGHT * 0.005); // Scale with world height
   const TRAIL_HISTORY = Infinity;
-  const COLLISION_GRACE_DISTANCE = 30;
-
-  const WORLD_HEIGHT = 800; // Vertical play area
-  const CAMERA_BUFFER = 400; // How far ahead to spawn obstacles
+  let COLLISION_GRACE_DISTANCE = TRAIL_WIDTH * 7.5;
 
   const PLAYER_COLOR = 0x00ffff; // Cyan
   const TRAIL_COLOR = 0x00ffff;
@@ -35,17 +35,17 @@
     0xd33682, // magenta
   ];
 
-  const GRID_SIZE = 50;
+  let GRID_SIZE = WORLD_HEIGHT * 0.0625; // Grid scales with world
   const GRID_COLOR = 0x40406a;
 
   // Rivals
   const NUM_RIVALS = 5;
-  const RIVAL_SPACING = TRAIL_WIDTH * 2; // Minimum spacing between players
+  let RIVAL_SPACING = TRAIL_WIDTH * 2; // Minimum spacing between players
   const LEADER_PENALTY_TIME = 800; // ms penalty for 1st place
   const RIVAL_PENALTY_TIME = 600; // ms penalty for everyone else
 
   // Slipstream mechanic
-  const SLIPSTREAM_RANGE = RIVAL_SPACING * 1.5; // Must be larger than spacing to allow slipstream
+  let SLIPSTREAM_RANGE = RIVAL_SPACING * 1.5; // Must be larger than spacing to allow slipstream
   const SLIPSTREAM_FILL_RATE = 0.5; // per frame
   const SLIPSTREAM_MAX = 100;
   const SLIPSTREAM_BOOST = 1.5; // speed multiplier
@@ -53,7 +53,7 @@
   // Boost system
   const BOOST_SPEED = 9.0; // Speed when boosting (higher than max slipstream)
   const BOOST_DURATION = 2000; // ms - how long boost lasts
-  const BOOST_ZONE_SIZE = 60; // Size of boost pickup zones
+  let BOOST_ZONE_SIZE = WORLD_HEIGHT * 0.075; // Size of boost pickup zones (scales with world)
   const BOOST_ZONE_SPAWN_CHANCE = 0.002; // Spawn rate for boost zones
 
   // Lives/Turbo system (like Dotstream)
@@ -415,7 +415,8 @@
     } else {
       // Diagonal funnel - 45° angled walls creating a diagonal passage
       const angleUp = Math.random() < 0.5; // Randomize direction
-      const funnelWidth = 300;
+      const funnelWidth = WORLD_HEIGHT * 0.375; // Responsive funnel width
+      const padding = WORLD_HEIGHT * 0.025; // Responsive padding
 
       // Calculate safe centerY range to ensure gap stays within track boundaries
       // Gap exits at: centerY ± funnelWidth (depending on angle direction)
@@ -423,12 +424,12 @@
       let minCenterY, maxCenterY;
       if (angleUp) {
         // Gap exits at centerY - funnelWidth, must be > -WORLD_HEIGHT/2 + gapSize/2
-        minCenterY = -WORLD_HEIGHT / 2 + gapSize / 2 + funnelWidth + 20;
-        maxCenterY = WORLD_HEIGHT / 2 - gapSize / 2 - 20;
+        minCenterY = -WORLD_HEIGHT / 2 + gapSize / 2 + funnelWidth + padding;
+        maxCenterY = WORLD_HEIGHT / 2 - gapSize / 2 - padding;
       } else {
         // Gap exits at centerY + funnelWidth, must be < WORLD_HEIGHT/2 - gapSize/2
-        minCenterY = -WORLD_HEIGHT / 2 + gapSize / 2 + 20;
-        maxCenterY = WORLD_HEIGHT / 2 - gapSize / 2 - funnelWidth - 20;
+        minCenterY = -WORLD_HEIGHT / 2 + gapSize / 2 + padding;
+        maxCenterY = WORLD_HEIGHT / 2 - gapSize / 2 - funnelWidth - padding;
       }
 
       // Random centerY within safe range
@@ -547,7 +548,7 @@
     // Remove obstacles that are off-screen to the left
     for (let i = obstacles.length - 1; i >= 0; i--) {
       const obs = obstacles[i];
-      if (obs.x < cameraX - 200) {
+      if (obs.x < cameraX - app.screen.width * 0.2) {
         obstacleContainer.removeChild(obs);
         obs.destroy();
         obstacles.splice(i, 1);
@@ -558,8 +559,8 @@
     obstacleDifficulty += 0.00001;
     const spawnChance = Math.min(0.003 + obstacleDifficulty, 0.01); // Cap at 0.01, start lower
 
-    // Enforce minimum spacing between obstacles - much larger gap
-    const minSpacing = 2500; // Much larger minimum distance
+    // Enforce minimum spacing between obstacles - responsive to screen width
+    const minSpacing = app.screen.width * 2.5;
     const spawnX = cameraX + app.screen.width + CAMERA_BUFFER;
     const distanceSinceLastObstacle = spawnX - lastObstacleX;
 
@@ -605,7 +606,7 @@
     // Remove off-screen boost zones
     for (let i = boostZones.length - 1; i >= 0; i--) {
       const zone = boostZones[i];
-      if (zone.x < cameraX - 200) {
+      if (zone.x < cameraX - app.screen.width * 0.2) {
         obstacleContainer.removeChild(zone.sprite);
         zone.sprite.destroy();
         boostZones.splice(i, 1);
@@ -615,7 +616,7 @@
     // Spawn new boost zones randomly
     const spawnX = cameraX + app.screen.width + CAMERA_BUFFER;
     const distanceSinceLastBoost = spawnX - lastBoostZoneX;
-    const minBoostSpacing = 800; // Minimum distance between boost zones
+    const minBoostSpacing = app.screen.width * 0.8; // Responsive minimum distance between boost zones
 
     if (distanceSinceLastBoost >= minBoostSpacing && Math.random() < BOOST_ZONE_SPAWN_CHANCE) {
       spawnBoostZone();
@@ -866,10 +867,10 @@
     splashScreenElement.style.display = "none";
     gameOverOverlay.style.display = "none";
 
-    // Initialize player at first position in diagonal
-    const startX = 100;
-    const horizontalSpacing = 150;
-    const verticalSpacing = 100;
+    // Initialize player at first position in diagonal (responsive sizing)
+    const startX = app.screen.width * 0.1;
+    const horizontalSpacing = app.screen.width * 0.15;
+    const verticalSpacing = WORLD_HEIGHT / (NUM_RIVALS + 1);
 
     player = {
       x: startX,
@@ -921,8 +922,8 @@
     cameraX = 0;
     slipstreamGauge = 0;
     slipstreamActive = false;
-    lastObstacleX = -2000;
-    lastBoostZoneX = -1000;
+    lastObstacleX = -app.screen.width * 2;
+    lastBoostZoneX = -app.screen.width;
     obstacleDifficulty = 0;
 
     // Reset race timing
@@ -1261,7 +1262,22 @@
     keys[e.code] = false;
   });
 
-  window.addEventListener("resize", repositionUI);
+  // Recalculate responsive values on resize
+  function updateResponsiveValues() {
+    WORLD_HEIGHT = window.innerHeight * 0.8;
+    CAMERA_BUFFER = window.innerWidth * 0.3;
+    TRAIL_WIDTH = Math.max(3, WORLD_HEIGHT * 0.005);
+    COLLISION_GRACE_DISTANCE = TRAIL_WIDTH * 7.5;
+    GRID_SIZE = WORLD_HEIGHT * 0.0625;
+    RIVAL_SPACING = TRAIL_WIDTH * 2;
+    SLIPSTREAM_RANGE = RIVAL_SPACING * 1.5;
+    BOOST_ZONE_SIZE = WORLD_HEIGHT * 0.075;
+  }
+
+  window.addEventListener("resize", () => {
+    updateResponsiveValues();
+    repositionUI();
+  });
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
   // --- Game Loop ---
@@ -1424,8 +1440,8 @@
       // AI: Stay mostly horizontal unless avoiding obstacles or collecting boosts
       let targetY = rival.y; // Default: maintain current Y position
 
-      // Look ahead for obstacles we WILL collide with
-      const lookAheadDist = 800;
+      // Look ahead for obstacles we WILL collide with (responsive)
+      const lookAheadDist = app.screen.width * 0.8;
       let mustAvoid = false;
       let targetingBoost = false;
 
@@ -1503,7 +1519,7 @@
 
       // If not avoiding obstacles and not already boosting, look for nearby boost zones
       if (!mustAvoid && !rival.boostTimer) {
-        const boostLookAheadDist = 600;
+        const boostLookAheadDist = app.screen.width * 0.6;
         let closestBoostDist = Infinity;
         let closestBoostY = null;
         const rivalId = `rival${i}`;
@@ -1525,8 +1541,8 @@
           }
         }
 
-        // If found a boost zone nearby, target it
-        if (closestBoostY !== null && closestBoostDist < 400) {
+        // If found a boost zone nearby, target it (responsive distance threshold)
+        if (closestBoostY !== null && closestBoostDist < app.screen.width * 0.4) {
           targetY = closestBoostY;
           targetingBoost = true;
         }
@@ -1622,8 +1638,9 @@
         }
       }
 
-      // Keep within bounds
-      rival.y = Math.max(-WORLD_HEIGHT / 2 + 50, Math.min(WORLD_HEIGHT / 2 - 50, rival.y));
+      // Keep within bounds (responsive margin)
+      const boundaryMargin = WORLD_HEIGHT * 0.0625;
+      rival.y = Math.max(-WORLD_HEIGHT / 2 + boundaryMargin, Math.min(WORLD_HEIGHT / 2 - boundaryMargin, rival.y));
 
       // Update trail
       const trail = rivalTrails[i];
