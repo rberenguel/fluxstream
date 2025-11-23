@@ -913,6 +913,16 @@
 
     trailPoints = [new PIXI.Point(player.x, player.y)];
 
+    // Clean up old rival sprites before creating new ones
+    if (rivals.length > 0) {
+      for (const rival of rivals) {
+        if (rival.sprite) {
+          world.removeChild(rival.sprite);
+          rival.sprite.destroy();
+        }
+      }
+    }
+
     // Initialize rivals in diagonal formation behind player
     rivals = [];
     rivalTrails = [];
