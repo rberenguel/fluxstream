@@ -113,6 +113,7 @@
   let trailPoints = [];
   let rivalTrails = [];
   let obstacles = [];
+  let allEncounteredObstacles = []; // Track all obstacles for minimap (never cleaned up)
   let boostZones = []; // Boost pickups on track
   let gameState = "splash"; // splash, playing, paused, gameOver
   let keys = {};
@@ -333,6 +334,12 @@
       topWall.gapY = gapY; // Store gap center for AI
       topWall.gapSize = gapSize;
       obstacles.push(topWall);
+      allEncounteredObstacles.push({
+        x: spawnX,
+        y: 0,
+        isWall: true,
+        wallBounds: { ...topWall.wallBounds }
+      });
       obstacleContainer.addChild(topWall);
 
       // Bottom wall (covers from gap to bottom of screen)
@@ -352,6 +359,12 @@
       bottomWall.gapY = gapY; // Store gap center for AI
       bottomWall.gapSize = gapSize;
       obstacles.push(bottomWall);
+      allEncounteredObstacles.push({
+        x: spawnX,
+        y: 0,
+        isWall: true,
+        wallBounds: { ...bottomWall.wallBounds }
+      });
       obstacleContainer.addChild(bottomWall);
 
     } else {
@@ -421,6 +434,14 @@
       topWall.gapSize = gapSize;
       topWall.funnelWidth = funnelWidth;
       obstacles.push(topWall);
+      allEncounteredObstacles.push({
+        x: spawnX,
+        y: 0,
+        isWall: true,
+        isDiagonal: true,
+        polygonVertices: topVertices.map(v => ({ ...v })),
+        angleUp: angleUp
+      });
       obstacleContainer.addChild(topWall);
 
       const bottomWall = new PIXI.Graphics();
@@ -465,6 +486,14 @@
       bottomWall.gapSize = gapSize;
       bottomWall.funnelWidth = funnelWidth;
       obstacles.push(bottomWall);
+      allEncounteredObstacles.push({
+        x: spawnX,
+        y: 0,
+        isWall: true,
+        isDiagonal: true,
+        polygonVertices: bottomVertices.map(v => ({ ...v })),
+        angleUp: angleUp
+      });
       obstacleContainer.addChild(bottomWall);
     }
   }
@@ -514,7 +543,7 @@
       sprite: zone,
       x: spawnX,
       y: spawnY,
-      collected: false
+      collectedBy: [] // Track which racers have collected this boost
     });
 
     obstacleContainer.addChild(zone);
@@ -549,26 +578,27 @@
 
   function checkBoostZoneCollisions() {
     for (const zone of boostZones) {
-      if (zone.collected) continue;
-
       // Check player collision
       const playerDist = Math.sqrt((player.x - zone.x) ** 2 + (player.y - zone.y) ** 2);
       if (playerDist < BOOST_ZONE_SIZE / 2 + TRAIL_WIDTH) {
-        zone.collected = true;
-        zone.sprite.alpha = 0.2; // Fade out
-        activateBoost(player);
+        // Only collect if player hasn't already collected this zone
+        if (!zone.collectedBy.includes('player')) {
+          zone.collectedBy.push('player');
+          activateBoost(player);
+        }
       }
 
       // Check rival collisions
-      for (const rival of rivals) {
+      for (let i = 0; i < rivals.length; i++) {
+        const rival = rivals[i];
         const rivalDist = Math.sqrt((rival.x - zone.x) ** 2 + (rival.y - zone.y) ** 2);
         if (rivalDist < BOOST_ZONE_SIZE / 2 + TRAIL_WIDTH) {
-          zone.collected = true;
-          zone.sprite.alpha = 0.2; // Fade out
-          if (!rival.boostTimer) {
+          const rivalId = `rival${i}`;
+          // Only collect if this rival hasn't already collected this zone
+          if (!zone.collectedBy.includes(rivalId) && !rival.boostTimer) {
+            zone.collectedBy.push(rivalId);
             rival.boostTimer = BOOST_DURATION;
           }
-          break;
         }
       }
     }
@@ -820,6 +850,7 @@
     }
 
     obstacles = [];
+    allEncounteredObstacles = [];
     boostZones = [];
     obstacleContainer.removeChildren();
     cameraX = 0;
@@ -896,8 +927,8 @@
     minimapBackground.drawRect(0, 0, minimapWidth, minimapHeight);
     minimapBackground.endFill();
 
-    // Render obstacles
-    for (const obs of obstacles) {
+    // Render obstacles (use allEncounteredObstacles to show entire race)
+    for (const obs of allEncounteredObstacles) {
       if (obs.isDiagonal && obs.polygonVertices) {
         // Render diagonal obstacle as polygon
         const points = [];
@@ -928,7 +959,9 @@
       const x = transformX(zone.x);
       const y = transformY(zone.y);
       const size = BOOST_ZONE_SIZE * scale;
-      minimapBoosts.beginFill(0x00ff00, zone.collected ? 0.3 : 0.7);
+      // Fade based on how many racers collected it (more collected = more faded)
+      const alpha = Math.max(0.3, 0.9 - zone.collectedBy.length * 0.1);
+      minimapBoosts.beginFill(0x00ff00, alpha);
       minimapBoosts.drawRect(x - size / 2, y - size / 2, size, size);
       minimapBoosts.endFill();
     }
@@ -1012,32 +1045,52 @@
 
     // Generate and add minimap image
     captureMinimapImage().then(dataUrl => {
-      // Add image to game over screen
-      let minimapImg = document.getElementById("minimap-image");
-      if (!minimapImg) {
-        minimapImg = document.createElement("img");
-        minimapImg.id = "minimap-image";
-        minimapImg.style.maxWidth = "90%";
-        minimapImg.style.maxHeight = "400px";
-        minimapImg.style.marginTop = "20px";
-        minimapImg.style.border = "2px solid #40406a";
-        minimapImg.style.cursor = "pointer";
-        minimapImg.title = "Click to download";
+      // Create container like Flux does
+      let container = document.getElementById("minimap-container");
+      if (!container) {
+        container = document.createElement("div");
+        container.id = "minimap-container";
+        container.style.textAlign = "center";
+        container.style.marginTop = "20px";
 
-        // Add download functionality
-        minimapImg.addEventListener("click", (e) => {
-          e.stopPropagation(); // Don't restart game when clicking image
-          const link = document.createElement("a");
-          link.download = `fluxstream-race-${Date.now()}.png`;
-          link.href = dataUrl;
-          link.click();
+        const image = document.createElement("img");
+        image.id = "minimap-image";
+        image.style.maxWidth = "90%";
+        image.style.maxHeight = "400px";
+        image.style.marginBottom = "15px";
+        image.style.border = "2px solid #40406a";
+        image.style.background = "rgba(0, 0, 0, 0.5)";
+        image.style.padding = "5px";
+
+        const link = document.createElement("a");
+        link.id = "minimap-download-link";
+        link.textContent = "Save Your Race";
+        link.style.display = "block";
+        link.style.color = "#00ffff";
+        link.style.textDecoration = "none";
+        link.style.fontSize = "18px";
+        link.style.cursor = "pointer";
+        link.download = `fluxstream-race-${Date.now()}.png`;
+
+        container.appendChild(image);
+        container.appendChild(link);
+
+        // Stop propagation so clicking doesn't restart game
+        container.addEventListener("pointerdown", (e) => {
+          e.stopPropagation();
         });
 
         // Insert before subtitle
         const menu = gameOverOverlay.querySelector(".menu");
-        menu.insertBefore(minimapImg, subtitle);
+        menu.insertBefore(container, subtitle);
       }
-      minimapImg.src = dataUrl;
+
+      // Update the image and link
+      const image = document.getElementById("minimap-image");
+      const link = document.getElementById("minimap-download-link");
+      image.src = dataUrl;
+      link.href = dataUrl;
+      link.download = `fluxstream-race-${Date.now()}.png`;
     }).catch(err => {
       console.error("Failed to generate minimap:", err);
     });
@@ -1303,12 +1356,13 @@
         return;
       }
 
-      // AI: Stay mostly horizontal unless avoiding obstacles
+      // AI: Stay mostly horizontal unless avoiding obstacles or collecting boosts
       let targetY = rival.y; // Default: maintain current Y position
 
       // Look ahead for obstacles we WILL collide with
       const lookAheadDist = 800;
       let mustAvoid = false;
+      let targetingBoost = false;
 
       for (const obs of obstacles) {
         if (!obs.isWall) continue;
@@ -1382,11 +1436,42 @@
         }
       }
 
+      // If not avoiding obstacles and not already boosting, look for nearby boost zones
+      if (!mustAvoid && !rival.boostTimer) {
+        const boostLookAheadDist = 600;
+        let closestBoostDist = Infinity;
+        let closestBoostY = null;
+        const rivalId = `rival${i}`;
+
+        for (const zone of boostZones) {
+          // Skip if this rival already collected this boost
+          if (zone.collectedBy.includes(rivalId)) continue;
+
+          const distX = zone.x - rival.x;
+          const distY = Math.abs(zone.y - rival.y);
+
+          // Check if boost is ahead and within reasonable range
+          if (distX > 0 && distX < boostLookAheadDist && distY < WORLD_HEIGHT * 0.4) {
+            const totalDist = Math.sqrt(distX * distX + distY * distY);
+            if (totalDist < closestBoostDist) {
+              closestBoostDist = totalDist;
+              closestBoostY = zone.y;
+            }
+          }
+        }
+
+        // If found a boost zone nearby, target it
+        if (closestBoostY !== null && closestBoostDist < 400) {
+          targetY = closestBoostY;
+          targetingBoost = true;
+        }
+      }
+
       const yDiff = targetY - rival.y;
 
       // Apply acceleration toward target
-      // Use stronger acceleration when actively avoiding obstacles
-      const accelStrength = mustAvoid ? 1.2 : 0.5; // Boost when avoiding
+      // Use stronger acceleration when actively avoiding obstacles or targeting boosts
+      const accelStrength = mustAvoid ? 1.2 : (targetingBoost ? 0.8 : 0.5);
       if (yDiff > 10) {
         rival.vy += PLAYER_ACCEL_Y * delta * accelStrength;
         rival.lastMoveDirection = 1;
