@@ -1,18 +1,18 @@
 const CACHE_NAME = "flux-cache-v0.1.2";
 const CACHE_FILES = [
-  './fonts/InterDisplay-Bold.woff2',
-  './fonts/InterDisplay-Italic.woff2',
-  './fonts/InterDisplay-Regular.woff2',
-  './fonts/SixtyFour.woff2',
-  './fonts/Sixtyfour.woff2',
-  './fonts/inter.css',
-  './fonts/sixtyfour.css',
-  './index.html',
-  './libs/pixi8.1.5.min.js',
-  './main.js',
-  './manifest.json',
-  './media/favicon.ico',
-  './media/icon.png',
+  "./fonts/InterDisplay-Bold.woff2",
+  "./fonts/InterDisplay-Italic.woff2",
+  "./fonts/InterDisplay-Regular.woff2",
+  "./fonts/SixtyFour.woff2",
+  "./fonts/Sixtyfour.woff2",
+  "./fonts/inter.css",
+  "./fonts/sixtyfour.css",
+  "./index.html",
+  "./libs/pixi8.1.5.min.js",
+  "./main.js",
+  "./manifest.json",
+  "./media/favicon.ico",
+  "./media/icon.png",
 ];
 
 // Install event: opens a cache and adds the core files to it.

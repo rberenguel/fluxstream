@@ -125,6 +125,58 @@
     return false;
   }
 
+  // Helper functions for mobile/orientation
+  function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent,
+    );
+  }
+
+  function isLandscape() {
+    // Check orientation API if available
+    if (window.screen.orientation) {
+      return (
+        window.screen.orientation.angle === 90 ||
+        window.screen.orientation.angle === -90 ||
+        window.screen.orientation.type.startsWith("landscape")
+      );
+    }
+    // Fallback to dimensions
+    return window.innerWidth > window.innerHeight;
+  }
+
+  function getLandscapeDimensions() {
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+
+    if (screenWidth >= screenHeight) {
+      return { width: screenWidth, height: screenHeight };
+    } else {
+      return { width: screenHeight, height: screenWidth };
+    }
+  }
+
+  function needsStandalone() {
+    const standaloneiOS = window.navigator.standalone === true;
+    const standaloneAndroid = window.matchMedia(
+      "(display-mode: standalone)",
+    ).matches;
+
+    const isDevel =
+      window.location.hostname.startsWith("192") ||
+      window.location.hostname.startsWith("127") ||
+      window.location.hostname === "localhost";
+
+    console.log("needsStandalone check:");
+    console.log("  isMobile:", isMobile());
+    console.log("  isDevel:", isDevel);
+    console.log("  standaloneiOS:", standaloneiOS);
+    console.log("  standaloneAndroid:", standaloneAndroid);
+    console.log("  hostname:", window.location.hostname);
+
+    return isMobile() && !isDevel && !standaloneiOS && !standaloneAndroid;
+  }
+
   const PLAYER_COLOR = 0x00ffff; // Cyan
   const TRAIL_COLOR = 0x00ffff;
   const OBSTACLE_COLOR = 0xff0000; // Red
@@ -164,9 +216,11 @@
   const INVINCIBILITY_TIME = 60; // frames of invincibility after hit
 
   // --- PIXI App Setup ---
+  const landscapeDimensions = getLandscapeDimensions();
   const app = new PIXI.Application();
   await app.init({
-    resizeTo: window,
+    width: landscapeDimensions.width,
+    height: landscapeDimensions.height,
     backgroundColor: 0x05050a,
     antialias: true,
   });
@@ -1546,6 +1600,42 @@
 
   app.ticker.add((ticker) => {
     const delta = ticker.deltaTime;
+
+    // Check for landscape orientation on mobile
+    if (isMobile() && !isLandscape()) {
+      // Hide canvas and show rotation message
+      app.canvas.style.display = "none";
+      const orientationWarning = document.getElementById("orientation-warning");
+      if (orientationWarning) {
+        orientationWarning.style.display = "flex";
+      }
+      return;
+    } else {
+      // Show canvas and hide warning
+      app.canvas.style.display = "block";
+      const orientationWarning = document.getElementById("orientation-warning");
+      if (orientationWarning) {
+        orientationWarning.style.display = "none";
+      }
+    }
+
+    // Check for PWA install requirement
+    const pwaWarning = document.getElementById("pwa-warning");
+    if (needsStandalone()) {
+      // Always show PWA warning if needs standalone
+      if (pwaWarning) {
+        pwaWarning.style.display = "flex";
+      }
+      if (gameState === "splash") {
+        splashScreenElement.style.display = "none";
+      }
+      return;
+    } else {
+      // Hide PWA warning if standalone or not mobile
+      if (pwaWarning) {
+        pwaWarning.style.display = "none";
+      }
+    }
 
     if (gameState !== "playing") {
       return;

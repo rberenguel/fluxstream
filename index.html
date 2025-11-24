@@ -203,12 +203,29 @@
           <p><span>BOOST</span><span>SPACE / TAP BOTH</span></p>
           <p><span>SLIPSTREAM</span><span>ALIGN WITH RIVALS</span></p>
           <p><span>PAUSE</span><span>ESCAPE / TAP TOP</span></p>
+          <hr />
+          <p>Best played on mobile (landscape)</p>
         </div>
         <p class="start-prompt">TAP ANYWHERE TO START</p>
       </div>
     </div>
     <div id="countdown-overlay">
       <div id="countdown-number">3</div>
+    </div>
+    <div id="orientation-warning" class="overlay" style="display: none">
+      <div class="menu">
+        <h1>ROTATE DEVICE</h1>
+        <p>Please rotate your device to landscape mode</p>
+      </div>
+    </div>
+    <div id="pwa-warning" class="overlay" style="display: none">
+      <div class="menu">
+        <h1>INSTALL REQUIRED</h1>
+        <p>Please install this game to your home screen to play</p>
+        <p style="font-size: clamp(12px, 2vh, 16px); margin-top: 20px">
+          Tap the share button and select "Add to Home Screen"
+        </p>
+      </div>
     </div>
     <div id="slipstream-vignette"></div>
     <div id="pause-overlay" class="overlay">
@@ -224,7 +241,7 @@
       </div>
     </div>
     <script src="main.js"></script>
-        <script>
+    <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", function () {
           navigator.serviceWorker.register("./sw.js").then(
