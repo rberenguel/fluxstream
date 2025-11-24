@@ -196,8 +196,8 @@
   // Rivals
   const NUM_RIVALS = 5;
   let RIVAL_SPACING = TRAIL_WIDTH * 2; // Minimum spacing between players
-  const LEADER_PENALTY_TIME = 800; // ms penalty for 1st place
-  const RIVAL_PENALTY_TIME = 600; // ms penalty for everyone else
+  const LEADER_PENALTY_TIME = 1800; // ms penalty for 1st place
+  const RIVAL_PENALTY_TIME = 1400; // ms penalty for everyone else
 
   // Slipstream mechanic
   let SLIPSTREAM_RANGE = RIVAL_SPACING * 1.5; // Must be larger than spacing to allow slipstream
@@ -371,7 +371,7 @@
     });
     positionText.anchor.set(0, 0);
     positionText.x = 20;
-    positionText.y = 20 + gaugeHeight + 10 + mainFontSize + 10; // Below lives text
+    positionText.y = 20; // Align with timer on the right
     app.stage.addChild(positionText);
 
     // Pursuer indicator (shows closest rival behind)
@@ -1111,6 +1111,12 @@
   }
 
   function showCountdown() {
+    // Clear any existing countdown first
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+
     // Hide splash, show countdown
     splashScreenElement.style.display = "none";
     const countdownOverlay = document.getElementById("countdown-overlay");
@@ -1121,7 +1127,7 @@
     let count = 3;
     countdownNumber.textContent = count;
 
-    const countdownInterval = setInterval(() => {
+    countdownInterval = setInterval(() => {
       count--;
       if (count > 0) {
         // Reset animation by removing and re-adding
@@ -1132,6 +1138,7 @@
         }, 10);
       } else {
         clearInterval(countdownInterval);
+        countdownInterval = null;
         countdownOverlay.classList.remove("active");
         actuallyStartGame();
       }
@@ -1598,42 +1605,76 @@
 
   // --- Game Loop ---
 
+  // Check warnings on load and store state
+  let showingWarning = false;
+  let countdownInterval = null; // Store countdown interval so we can cancel it
+
   app.ticker.add((ticker) => {
     const delta = ticker.deltaTime;
 
     // Check for landscape orientation on mobile
     if (isMobile() && !isLandscape()) {
-      // Hide canvas and show rotation message
+      // Stop countdown if running
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+
+      // Hide everything and show rotation message
       app.canvas.style.display = "none";
+      splashScreenElement.style.display = "none";
+      const countdownOverlay = document.getElementById("countdown-overlay");
+      if (countdownOverlay) countdownOverlay.classList.remove("active");
+
       const orientationWarning = document.getElementById("orientation-warning");
       if (orientationWarning) {
         orientationWarning.style.display = "flex";
       }
+      showingWarning = true;
       return;
     } else {
       // Show canvas and hide warning
-      app.canvas.style.display = "block";
       const orientationWarning = document.getElementById("orientation-warning");
-      if (orientationWarning) {
+      if (orientationWarning && orientationWarning.style.display === "flex") {
         orientationWarning.style.display = "none";
+        showingWarning = false;
+        // Show splash when warning is dismissed
+        if (gameState === "splash") {
+          splashScreenElement.style.display = "flex";
+        }
       }
+      app.canvas.style.display = "block";
     }
 
     // Check for PWA install requirement
     const pwaWarning = document.getElementById("pwa-warning");
     if (needsStandalone()) {
+      // Stop countdown if running
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+
       // Always show PWA warning if needs standalone
+      app.canvas.style.display = "none";
+      splashScreenElement.style.display = "none";
+      const countdownOverlay = document.getElementById("countdown-overlay");
+      if (countdownOverlay) countdownOverlay.classList.remove("active");
+
       if (pwaWarning) {
         pwaWarning.style.display = "flex";
       }
-      if (gameState === "splash") {
-        splashScreenElement.style.display = "none";
-      }
+      showingWarning = true;
       return;
     } else {
       // Hide PWA warning if standalone or not mobile
-      if (pwaWarning) {
+      if (pwaWarning && pwaWarning.style.display === "flex") {
         pwaWarning.style.display = "none";
+        showingWarning = false;
+        // Show splash when warning is dismissed
+        if (gameState === "splash") {
+          splashScreenElement.style.display = "flex";
+        }
       }
     }
 

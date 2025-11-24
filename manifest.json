@@ -2,7 +2,7 @@
   "name": "Fluxstream",
   "short_name": "Fluxstream",
   "author": "Ruben Berenguel",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "High-speed racing game with track-based positioning and slipstream mechanics",
   "start_url": "./index.html",
   "display": "standalone",
