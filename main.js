@@ -1,7 +1,10 @@
 (async () => {
   // --- Difficulty Settings ---
   // 0.25 = Easy, 0.5 = Normal, 1.0 = Hard, 1.25 = Ultra Hard
-  const DIFFICULTY_MULTIPLIER = 0.5; // Normal difficulty
+  const BASE_DIFFICULTY_MULTIPLIER = 0.5; // Normal difficulty
+  const DIFFICULTY_MULTIPLIER = isMobile()
+    ? BASE_DIFFICULTY_MULTIPLIER * 1.5
+    : BASE_DIFFICULTY_MULTIPLIER;
 
   // --- Game Configuration (Responsive speeds based on screen width) ---
   // Base speed is intentionally lower - momentum system brings it up to normal
@@ -218,11 +221,17 @@
   // --- PIXI App Setup ---
   const landscapeDimensions = getLandscapeDimensions();
   const app = new PIXI.Application();
+
+  // On mobile, use lower resolution for better performance
+  const resolution = isMobile() ? 1 : window.devicePixelRatio || 1;
+
   await app.init({
     width: landscapeDimensions.width,
     height: landscapeDimensions.height,
     backgroundColor: 0x05050a,
     antialias: true,
+    resolution: resolution,
+    autoDensity: true,
   });
   document.body.appendChild(app.view);
 
@@ -1049,20 +1058,33 @@
     const isMovingHorizontal = Math.abs(player.vy) < 0.1;
 
     if (isMovingHorizontal) {
-      for (let i = 0; i < rivals.length; i++) {
-        const rival = rivals[i];
-        // Must be ahead of player
-        if (rival.x <= player.x) continue;
+      const playerTrack = getTrackIndex(player.y);
+      const lookAheadDistance = SLIPSTREAM_RANGE * 2;
 
-        // Check if on adjacent track (track-based slipstream)
-        const playerTrack = getTrackIndex(player.y);
-        const rivalTrack = getTrackIndex(rival.y);
+      // Check rival trails (not rival positions) for slipstream
+      for (let i = 0; i < rivalTrails.length; i++) {
+        const trail = rivalTrails[i];
+        if (!trail || trail.length < 2) continue;
 
-        // Slipstream works if on nearest adjacent track (not same track!)
-        if (Math.abs(playerTrack - rivalTrack) === 1) {
-          isSlipstreaming = true;
-          break;
+        // Check if any part of this trail is on an adjacent track and ahead of player
+        for (let j = 0; j < trail.length; j++) {
+          const point = trail[j];
+
+          // Only check trail points within slipstream range ahead
+          if (point.x <= player.x || point.x > player.x + lookAheadDistance)
+            continue;
+
+          // Check if this trail point is on an adjacent track
+          const trailTrack = getTrackIndex(point.y);
+
+          // Slipstream works if trail is on nearest adjacent track (not same track!)
+          if (Math.abs(playerTrack - trailTrack) === 1) {
+            isSlipstreaming = true;
+            break;
+          }
         }
+
+        if (isSlipstreaming) break;
       }
     }
 
