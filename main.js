@@ -1691,7 +1691,7 @@
       keys["ArrowDown"] ||
       keys["KeyS"] ||
       (activeTouches > 0 && keys["touchRight"]);
-    const boost = keys["Space"] || (keys["touchLeft"] && keys["touchRight"]);
+    const boost = keys["Space"] || activeTouches >= 2;
 
     // Manual boost - consumes life (but can't use last life)
     if (boost && player.lives > 1 && !player.boostTimer) {
